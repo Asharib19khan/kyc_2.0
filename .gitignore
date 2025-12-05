@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+venv/
+env/
+.env
+.DS_Store
+*.accdb
+*.laccdb
+*.log
+kyc_backend/database/*.accdb
+kyc_backend/database/*.laccdb
+kyc_backend/uploads/*.pdf
+kyc_backend/uploads/*.png
+kyc_backend/uploads/*.jpg
