@@ -12,10 +12,9 @@ def get_audit_logs():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT log_id, user_id, action, action_timestamp, ip_address 
+        SELECT TOP 50 log_id, user_id, action, action_timestamp, ip_address 
         FROM AUDIT_LOG 
-        ORDER BY action_timestamp DESC 
-        TOP 50
+        ORDER BY action_timestamp DESC
     """)
     # Note: TOP 50 is MS Access specific.
     
