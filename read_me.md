@@ -1,103 +1,51 @@
-# KYC & Loan Management System
+## KYC & Loan Management System
+A complete KYC and Loan Management system I built with Python on the backend and React on the frontend, connected to a Microsoft Access database.
 
-This is a complete KYC and Loan Management system built with Python (Backend) and React (Frontend), using a Microsoft Access database.
+# What You Need
+You'll need Python 3.10, Node.js with npm, and the Microsoft Access ODBC driver
 
-## Prerequisites
-- Python 3.x
-- Node.js & npm
-- Microsoft Access Driver (ODBC) installed (standard with Office or searchable as "Microsoft Access Database Engine 2016 Redistributable")
+# How It's Organized
+I split this into two main folders: 
+1) kyc-backend; handles the Flask server, the Access database, and all the PDF/Excel generation. 
+2) kyc-frontend; is the React app built with Vite.
 
-## Project Structure
-- `kyc-backend/`: Flask server, Access DB, PDF/Excel generation.
-- `kyc-frontend/`: React application (Vite).
+# Getting It Running
 
-## Setup Instructions
-
-### 1. Database Setup
-The system uses `kyc-backend/db/kyc.accdb`.
-- If the file is missing, the system will look for it.
-- **IMPORTANT**: You must have a `db/kyc.accdb` file.
-- Run `python init_db.py` inside `kyc-backend/` to create the tables if you have an empty Access file, or to verify connection.
-
-### 2. Backend Setup
-1. Open a terminal in `kyc-backend/`.
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Initialize/Check DB (optional but recommended):
-   ```bash
-   python init_db.py
-   ```
-   *Note: If you don't have an Access file, create an empty one named `kyc.accdb` in `kyc-backend/db/` first.*
-4. Start the server:
-   ```bash
-   python app.py
-   ```
-   Server runs at `http://127.0.0.1:5000`.
-
-### 3. Frontend Setup
-1. Open a new terminal in `kyc-frontend/`.
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the dev server:
-   ```bash
-   npm run dev
-   ```
-4. Open your browser at `http://localhost:5173`.
-
-## Usage Workflow
-1. **Admin**: Login with `admin` / `admin123` (seeded by `init_db.py` or default).
-2. **Customer**: Click "Register" to create an account.
-3. **Verification**: 
-   - Login as Admin.
-   - Go to Dashboard -> Verification Requests.
-   - Click "Approve" for the new customer.
-4. **Loan Application**:
-   - Login as the Customer.
-   - Apply for a loan on the dashboard.
-5. **Loan Decision**:
-   - Login as Admin.
-   - Go to Dashboard -> Loan Requests.
-   - Click "Approve" or "Reject".
-   - **Download PDF**: Click the button (or check `admin_exports` folder).
-6. **Reporting**:
-   - As Admin, click "Export Excel Report" to download `.xlsx`.
-
-## Deployment (Git & Hosting)
-
-### 1. Git Push
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-# Create repo on GitHub
-git remote add origin https://github.com/YOUR_USERNAME/kyc-loans.git
-git push -u origin main
+1) Setting Up the Database;
+- The system lives in [kyc-backend/db/kyc.accdb]
+```Bash
+python init_db.py  #kyc-backend folder
 ```
 
-### 2. Hosting
-**Backend (Python + Access)**:
-- Hosting Access DBs online is difficult (Access is file-based).
-- **Recommended**: Host on a **Windows VPS** (e.g., AWS EC2 Windows, Azure VM) or local server.
-- **Service**: PythonAnywhere (supports SQLite/MySQL but not Access easily).
-- **Instruction**: 
-  - Rent a generic Windows VPS.
-  - Clone repo.
-  - Install Python & Drivers.
-  - Run `python app.py`.
+2) Starting the Backend; kyc-backend: 
+```bash 
+pip install -r requirements.txt"
+```
+again 
+```bash 
+python init_db.py
+now 
+```bash 
+python app.py
+```
+The server will simply spin up.
 
-**Frontend (React)**:
-- Build for production:
-  ```bash
-  npm run build
-  ```
-- Host `dist/` folder on Netlify/Vercel:
-  - **Netlify**: Drag and drop `dist` folder.
-  - **GitHub Pages**: Use `gh-pages` package.
+3) Starting the Frontend
+kyc-frontend: 
+```bash
+npm install
+```bash 
+npm run dev
+```
 
-## Notes
-- **Security**: Passwords are stored in plain text for educational clarity. DO NOT use in real production.
-- **Reporting**: Excel files generated in `backend/reports/`. PDFs in `backend/admin_exports/`.
+4) Then just open [http://localhost:xyz] in your browser.
+
+5) How to Use It
+Start by logging in as the admin (username: admin, password: admin123). If you want to test the customer flow, click register to create a new account. Once you're set up as a customer, you can submit a loan application. Then switch back to the admin account and go to the dashboard to approve or reject applications. When you approve a loan, you can download a PDF of the decision. There's also an Excel export button if you want to pull all your data into a spreadsheet.
+
+[https://github.com/Asharib19khan/kyc_2.0.git]
+
+Hosting It
+The tricky part is that Access databases are file-based, so they don't play nicely with most hosting platforms. Your best bet is to spin up a Windows VPS somewhere (AWS, Azure, whatever) and just run it there. Clone the repo, install Python and the drivers, and fire up python app.py.
+For the frontend, build it with npm run build and throw the dist folder onto Netlify or Vercel. They'll handle the rest.
+Fair Warning
