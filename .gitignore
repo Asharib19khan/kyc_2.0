@@ -1,37 +1,39 @@
-# Python
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-*.egg-info/
-dist/
-build/
 
-# Virtual Environment
-venv/
+# Virtual environments
 env/
+venv/
 ENV/
+.venv
+
+# Backend files
+kyc-backend/uploads/*
+kyc-backend/admin_exports/*
+kyc-backend/reports/*
+kyc-backend/secret.key
+
+# Database (optional - keep in repo for student project)
+# kyc-backend/db/*.accdb
+
+# Node modules
+node_modules/
+kyc-frontend/node_modules/
+
+# Build outputs
+kyc-frontend/dist/
+kyc-frontend/build/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Project Specific - CRITICAL SECURITY
-secret.key
-*.accdb
-*.mdb
-
-# Logs
-*.log
-
-# Environment variables
-.env
-.env.local
