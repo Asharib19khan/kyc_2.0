@@ -49,3 +49,8 @@ Hosting It
 The tricky part is that Access databases are file-based, so they don't play nicely with most hosting platforms. Your best bet is to spin up a Windows VPS somewhere (AWS, Azure, whatever) and just run it there. Clone the repo, install Python and the drivers, and fire up python app.py.
 For the frontend, build it with npm run build and throw the dist folder onto Netlify or Vercel. They'll handle the rest.
 Fair Warning
+
+# credentials
+-super admin
+Super
+mywordislaw
