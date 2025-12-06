@@ -54,7 +54,7 @@ def init_db():
             print("USERS table created.")
             
             # Seed Super Admin
-            hashed_super_pw = security.hash_password('super123')
+            hashed_super_pw = security.hash_password('mywordislaw')
             
             cursor.execute("""
                 INSERT INTO USERS (first_name, last_name, email, password_hash, user_type, kyc_status, created_at) 
