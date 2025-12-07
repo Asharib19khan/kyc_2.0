@@ -6,6 +6,7 @@ import {
   CalendarIcon, ShieldIcon, MenuIcon, SunIcon, MoonIcon, DownloadIcon
 } from './Icons';
 import { toast } from 'react-hot-toast';
+import { API_BASE_URL } from '../config';
 
 function CustomerDashboard() {
   const [activeSection, setActiveSection] = useState('overview');
@@ -64,7 +65,7 @@ function CustomerDashboard() {
 
   const fetchLoans = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/customer/loans?user_id=${user.id}`, {
+      const res = await fetch('http://localhost:5000/customer/loans', {
         headers: { 'Authorization': localStorage.getItem('token') }
       });
       const data = await res.json();

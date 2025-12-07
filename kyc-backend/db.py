@@ -277,7 +277,7 @@ def get_customer_loans(user_id):
     cursor = conn.cursor()
     loans = []
     try:
-        cursor.execute("""SELECT loan_id, loan_amount, tenure_months, loan_purpose, application_status, application_date, admin_notes, pdf_document_path 
+        cursor.execute("""SELECT loan_id, loan_amount, tenure_months, loan_purpose, application_status, application_date, pdf_document_path 
                           FROM LOAN_APPLICATIONS WHERE user_id = ?""", (user_id,))
         for row in cursor.fetchall():
             loans.append({
@@ -287,8 +287,7 @@ def get_customer_loans(user_id):
                 "purpose": row[3],
                 "status": row[4],
                 "applied_at": str(row[5]),
-                "notes": row[6],
-                "pdf_path": row[7]
+                "pdf_path": row[6]
             })
     finally:
         conn.close()
@@ -300,11 +299,11 @@ def update_loan_decision(loan_id, decision, admin_id, pdf_path, notes=""):
     cursor = conn.cursor()
     try:
         status = 'approved' if decision == 'approve' else 'rejected'
-        # update status, admin, date, notes, pdf_path
+        # Update status, admin, date, pdf_path (admin_notes column doesn't exist)
         sql = """UPDATE LOAN_APPLICATIONS 
-                 SET application_status = ?, approved_by = ?, approval_date = ?, admin_notes = ?, pdf_document_path = ?
+                 SET application_status = ?, approved_by = ?, approval_date = ?, pdf_document_path = ?
                  WHERE loan_id = ?"""
-        cursor.execute(sql, (status, admin_id, datetime.datetime.now(), notes, pdf_path, loan_id))
+        cursor.execute(sql, (status, admin_id, datetime.datetime.now(), pdf_path, loan_id))
         conn.commit()
         return True
     except Exception as e:

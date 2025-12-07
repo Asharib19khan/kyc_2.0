@@ -81,6 +81,7 @@ def init_db():
                     verification_status VARCHAR(20)
                 )
             """)
+            conn.commit()
             print("DOCUMENTS table created.")
         except Exception as e: print(f"DOCUMENTS creation error: {e}")
 
@@ -100,6 +101,7 @@ def init_db():
                     pdf_document_path VARCHAR(255)
                 )
             """)
+            conn.commit()
             print("LOAN_APPLICATIONS table created.")
         except Exception as e: print(f"LOAN_APPLICATIONS creation error: {e}")
 
@@ -114,6 +116,7 @@ def init_db():
                     ip_address VARCHAR(50)
                 )
             """)
+            conn.commit()
             print("AUDIT_LOG table created.")
         except Exception as e: print(f"AUDIT_LOG creation error: {e}")
 

@@ -130,22 +130,36 @@ function AdminDashboard() {
     e.preventDefault();
     const { loanId, action } = noteModal;
     
-    // Close modal immediately
+    if (!loanId || !action) {
+      toast.error('Missing loan ID or action');
+      return;
+    }
+
+    // Close modal and show loading
     setNoteModal({ show: false, loanId: null, action: null });
 
-    const res = await fetch('http://localhost:5000/admin/loan-decision', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': localStorage.getItem('token')
-      },
-      body: JSON.stringify({ loan_id: loanId, decision: action, notes: noteText })
-    });
-    const data = await res.json();
-    
-    if (data.success) {
-      fetchData();
-      toast.success(`Loan ${action}d!`);
+    try {
+      const res = await fetch('http://localhost:5000/admin/loan-decision', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': localStorage.getItem('token')
+        },
+        body: JSON.stringify({ loan_id: loanId, decision: action, notes: noteText })
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        fetchData();
+        toast.success(`Loan ${action}d!`);
+        setNoteText(''); // Clear notes
+      } else {
+        toast.error(data.message || 'Failed to process loan decision');
+      }
+    } catch (error) {
+      console.error('Loan decision error:', error);
+      toast.error('Network error. Please check if the backend is running.');
     }
   };
 
