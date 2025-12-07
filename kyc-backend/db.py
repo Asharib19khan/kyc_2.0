@@ -134,7 +134,7 @@ def delete_admin(admin_id):
 # --- DOCUMENTS ---
 def upload_document(user_id, doc_type, doc_number, expiry, filepath):
     conn = connect_db()
-    if not conn: return False
+    if not conn: return False, "Database connection failed"
     cursor = conn.cursor()
     try:
         # Encrypt Document Number
@@ -144,7 +144,6 @@ def upload_document(user_id, doc_type, doc_number, expiry, filepath):
                  VALUES (?, ?, ?, ?, ?, ?, 'pending')"""
         cursor.execute(sql, (user_id, doc_type, encrypted_num, expiry, filepath, datetime.datetime.now()))
         conn.commit()
-        log_audit(user_id, 'document_upload')
         log_audit(user_id, 'document_upload')
         return True, None
     except Exception as e:

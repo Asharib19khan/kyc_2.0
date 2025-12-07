@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { API_BASE_URL } from '../config';
 import { UserIcon, LockIcon, ShieldIcon, SunIcon, MoonIcon } from './Icons';
 
 function Login() {
@@ -34,7 +35,7 @@ function Login() {
         loginRole = 'super_admin';
       }
       
-      const res = await fetch('http://localhost:5000/login', {
+      const res = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cnic, password, role: loginRole })

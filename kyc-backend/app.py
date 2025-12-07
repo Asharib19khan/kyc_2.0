@@ -54,7 +54,18 @@ def register():
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
-    user = db.login_user(data['email'], data['password']) 
+    
+    # Validate input
+    email = data.get('email', '').strip()
+    password = data.get('password', '').strip()
+    
+    if not email or not password:
+        return jsonify({"success": False, "message": "Email and password are required"}), 400
+    
+    if '@' not in email and email != 'super':  # Allow 'super' for super admin
+        return jsonify({"success": False, "message": "Invalid email format"}), 400
+    
+    user = db.login_user(email, password)
     if user:
         token = generate_token(user['role'], user['name'], user['id'])
         return jsonify({"success": True, "token": token, "user": user})
@@ -137,6 +148,15 @@ def apply_loan():
     success = db.create_loan_request(user_info['user_id'], data['amount'], data['term'], data['purpose'])
     return jsonify({"success": success})
 
+@app.route('/customer/loans', methods=['GET'])
+def customer_loans():
+    user_info = require_auth('customer')
+    if not user_info: return jsonify({"success": False}), 403
+    
+    loans = db.get_customer_loans(user_info['user_id'])
+    return jsonify({"success": True, "data": loans})
+
+
 @app.route('/admin/loan-requests', methods=['GET'])
 def loan_requests():
     if not require_auth('admin'): return jsonify({"success": False}), 403
@@ -145,19 +165,15 @@ def loan_requests():
 
 @app.route('/admin/loan-decision', methods=['POST'])
 def loan_decision():
-    print("Received Loan Decision Request") # DEBUG
     user_info = require_auth('admin')
     if not user_info: 
-        print("Auth Failed") # DEBUG
         return jsonify({"success": False}), 403
     
     data = request.json
-    print(f"Decision Data: {data}") # DEBUG
 
     # 1. Get Loan Details for PDF
     loan_details = db.get_loan_details(data['loan_id'])
     if not loan_details: 
-        print("Loan not found") # DEBUG
         return jsonify({"success": False}), 400
     
     # 2. Add decision info
@@ -168,17 +184,11 @@ def loan_decision():
 
     # 3. Generate PDF
     try:
-        print("Generating PDF...") # DEBUG
         pdf_filename = reports.generate_loan_pdf(loan_details)
-        print(f"PDF Generated: {pdf_filename}") # DEBUG
     except Exception as e:
-        print(f"PDF Gen Error: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({"success": False, "message": f"PDF Error: {e}"}), 500
 
     # 4. Update Database
-    print("Updating Database...") # DEBUG
     success = db.update_loan_decision(
         loan_id=data['loan_id'],
         decision=data['decision'],
@@ -188,10 +198,8 @@ def loan_decision():
     )
     
     if success:
-        print("Update Success") # DEBUG
         return jsonify({"success": True})
     else:
-        print("Update Failed") # DEBUG
         return jsonify({"success": False, "message": "Database update failed"}), 500
 
 @app.route('/export/excel', methods=['GET'])
@@ -215,7 +223,7 @@ def export_csv():
     else:
         return jsonify({"success": False, "message": "Invalid type"}), 400
         
-    filename = reports.generate_csv_report(data, export_type)
+    filename = reports.generate_csv_export(data, export_type)
     return jsonify({"success": True, "download_url": f"/download-report/{filename}"})
 
 @app.route('/download-pdf/<filename>')
@@ -225,6 +233,76 @@ def download_pdf(filename):
 @app.route('/download-report/<filename>')
 def download_report(filename):
     return send_from_directory('reports', filename)
+
+@app.route('/admin/search/users', methods=['GET'])
+def search_users():
+    if not require_auth('admin'): return jsonify({"success": False}), 403
+    query = request.args.get('query', '').lower()
+    
+    all_users = db.get_verification_requests(show_history=True)
+    filtered_users = [u for u in all_users if query in u['name'].lower() or query in u['email'].lower()]
+    
+    return jsonify({"success": True, "data": filtered_users})
+
+@app.route('/admin/search/loans', methods=['GET'])
+def search_loans():
+    if not require_auth('admin'): return jsonify({"success": False}), 403
+    status = request.args.get('status', '').lower()
+    
+    all_loans = db.get_all_loan_requests()
+    if status:
+        filtered_loans = [loan for loan in all_loans if loan.get('status', '').lower() == status]
+    else:
+        filtered_loans = all_loans
+    
+    return jsonify({"success": True, "data": filtered_loans})
+
+@app.route('/admin/stats/kyc-success-rate', methods=['GET'])
+def kyc_success_rate():
+    if not require_auth('admin'): return jsonify({"success": False}), 403
+    
+    all_users = db.get_verification_requests(show_history=True)
+    total = len(all_users)
+    verified = len([u for u in all_users if u['status'] == 'verified'])
+    rate = (verified / total * 100) if total > 0 else 0
+    
+    return jsonify({"success": True, "rate": round(rate, 1), "verified": verified, "total": total})
+
+@app.route('/admin/stats/loan-approval-rate', methods=['GET'])
+def loan_approval_rate():
+    if not require_auth('admin'): return jsonify({"success": False}), 403
+    
+    all_loans = db.get_all_loan_requests()
+    total = len(all_loans)
+    approved = len([loan for loan in all_loans if loan.get('status') == 'approved'])
+    rate = (approved / total * 100) if total > 0 else 0
+    
+    return jsonify({"success": True, "rate": round(rate, 1), "approved": approved, "total": total})
+
+@app.route('/admin/stats/monthly-applications', methods=['GET'])
+def monthly_applications():
+    if not require_auth('admin'): return jsonify({"success": False}), 403
+    
+    all_loans = db.get_all_loan_requests()
+    now = datetime.datetime.now()
+    this_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_month = (this_month_start - datetime.timedelta(days=1)).replace(day=1)
+    
+    this_month_count = 0
+    last_month_count = 0
+    
+    for loan in all_loans:
+        try:
+            app_date = datetime.datetime.strptime(loan.get('applied_at', ''), '%Y-%m-%d %H:%M:%S')
+            if app_date >= this_month_start:
+                this_month_count += 1
+            elif app_date >= last_month and app_date < this_month_start:
+                last_month_count += 1
+        except:
+            pass
+    
+    return jsonify({"success": True, "this_month": this_month_count, "last_month": last_month_count})
+
 
 @app.route('/uploads/<filename>')
 def serve_upload(filename):

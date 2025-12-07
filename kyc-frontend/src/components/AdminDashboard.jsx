@@ -6,6 +6,8 @@ import {
   ShieldIcon, AlertIcon, MenuIcon, SunIcon, MoonIcon
 } from './Icons';
 import { toast } from 'react-hot-toast';
+import { useTheme } from '../hooks/useTheme';
+import { getThemeColors } from '../utils/themeColors';
 
 function AdminDashboard() {
   const [activeSection, setActiveSection] = useState('overview');
@@ -16,7 +18,6 @@ function AdminDashboard() {
   const [newAdmin, setNewAdmin] = useState({ first: '', last: '', email: '', password: '' });
   const [showModal, setShowModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [theme, setTheme] = useState('dark');
   const [showHistory, setShowHistory] = useState(false); // New state for history toggle
   
   // New State for Note Modal
@@ -26,50 +27,18 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isSuper = user.role === 'super_admin';
+  const { theme, toggleTheme } = useTheme();
+  const colors = getThemeColors(theme);
 
   useEffect(() => {
     if (user.role !== 'admin' && user.role !== 'super_admin') navigate('/login');
     fetchData();
-    // Load theme
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    setTheme(savedTheme);
-    document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
 
   // Refetch when showHistory toggles
   useEffect(() => {
     fetchData();
   }, [showHistory]);
-
-  const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-  };
-
-  // Theme-aware colors
-  const colors = theme === 'dark' ? {
-    bgPrimary: '#0f0f1e',
-    bgSecondary: 'rgba(22, 22, 42, 0.98)',
-    bgCard: 'rgba(30, 30, 56, 0.7)',
-    bgInput: 'rgba(15, 15, 30, 0.6)',
-    textPrimary: '#f1f5f9',
-    textSecondary: '#94a3b8',
-    textMuted: '#64748b',
-    border: 'rgba(255,255,255,0.08)',
-    borderHover: 'rgba(255,255,255,0.15)'
-  } : {
-    bgPrimary: '#f0f4f8',
-    bgSecondary: '#ffffff',
-    bgCard: 'rgba(255, 255, 255, 0.95)',
-    bgInput: '#f8fafc',
-    textPrimary: '#1e293b',
-    textSecondary: '#475569',
-    textMuted: '#64748b',
-    border: 'rgba(0,0,0,0.1)',
-    borderHover: 'rgba(0,0,0,0.2)'
-  };
 
   const fetchData = () => {
     const headers = { 'Authorization': localStorage.getItem('token') };
@@ -187,7 +156,20 @@ function AdminDashboard() {
     const data = await res.json();
     if (data.success) {
       window.open('http://localhost:5000' + data.download_url, '_blank');
+      toast.success('Excel report downloaded!');
+    }
+  };
+
+  const exportCSV = async (type) => {
+    const res = await fetch(`http://localhost:5000/export/csv?type=${type}`, {
+      headers: { 'Authorization': localStorage.getItem('token') }
+    });
+    const data = await res.json();
+    if (data.success) {
+      window.open('http://localhost:5000' + data.download_url, '_blank');
       toast.success(`${type === 'customers' ? 'Customer' : 'Loan'} data exported to CSV!`);
+    } else {
+      toast.error('Failed to export CSV');
     }
   };
 
