@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   HomeIcon, UsersIcon, FileIcon, DollarIcon, ChartIcon,
   SettingsIcon, LogoutIcon, CheckIcon, XIcon, DownloadIcon,
-  ShieldIcon, AlertIcon, MenuIcon
+  ShieldIcon, AlertIcon, MenuIcon, SunIcon, MoonIcon
 } from './Icons';
 
 function AdminDashboard() {
@@ -15,6 +15,7 @@ function AdminDashboard() {
   const [newAdmin, setNewAdmin] = useState({ first: '', last: '', email: '', password: '' });
   const [showModal, setShowModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [theme, setTheme] = useState('dark');
 
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -23,7 +24,41 @@ function AdminDashboard() {
   useEffect(() => {
     if (user.role !== 'admin' && user.role !== 'super_admin') navigate('/login');
     fetchData();
+    // Load theme
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    setTheme(savedTheme);
+    document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+  };
+
+  // Theme-aware colors
+  const colors = theme === 'dark' ? {
+    bgPrimary: '#0f0f1e',
+    bgSecondary: 'rgba(22, 22, 42, 0.98)',
+    bgCard: 'rgba(30, 30, 56, 0.7)',
+    bgInput: 'rgba(15, 15, 30, 0.6)',
+    textPrimary: '#f1f5f9',
+    textSecondary: '#94a3b8',
+    textMuted: '#64748b',
+    border: 'rgba(255,255,255,0.08)',
+    borderHover: 'rgba(255,255,255,0.15)'
+  } : {
+    bgPrimary: '#f0f4f8',
+    bgSecondary: '#ffffff',
+    bgCard: 'rgba(255, 255, 255, 0.95)',
+    bgInput: '#f8fafc',
+    textPrimary: '#1e293b',
+    textSecondary: '#475569',
+    textMuted: '#64748b',
+    border: 'rgba(0,0,0,0.1)',
+    borderHover: 'rgba(0,0,0,0.2)'
+  };
 
   const fetchData = () => {
     const headers = { 'Authorization': localStorage.getItem('token') };
@@ -144,15 +179,38 @@ function AdminDashboard() {
   };
 
   return (
-    <div className="dashboard-container">
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      background: theme === 'dark' 
+        ? 'linear-gradient(135deg, #0f0f1e 0%, #16162a 100%)'
+        : 'linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%)'
+    }}>
       {/* Sidebar */}
-      <div className={`dashboard-sidebar ${sidebarOpen ? '' : 'closed'}`}>
+      <div style={{
+        width: sidebarOpen ? '280px' : '0',
+        minWidth: sidebarOpen ? '280px' : '0',
+        background: theme === 'dark' ? 'rgba(22, 22, 42, 0.98)' : 'rgba(255, 255, 255, 0.98)',
+        backdropFilter: 'blur(20px)',
+        borderRight: `1px solid ${colors.border}`,
+        padding: sidebarOpen ? '1.5rem' : '0',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'fixed',
+        height: '100vh',
+        left: 0,
+        top: 0,
+        zIndex: 100,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        transition: 'all 0.3s ease'
+      }}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
           <div style={{
             width: '40px',
             height: '40px',
-            background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%)',
+            background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
             borderRadius: '0.75rem',
             display: 'flex',
             alignItems: 'center',
@@ -161,107 +219,134 @@ function AdminDashboard() {
             <ShieldIcon size={24} color="white" />
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.125rem' }}>KYC Portal</h3>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+            <h3 style={{ margin: 0, fontSize: '1.125rem', color: colors.textPrimary }}>KYC Portal</h3>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: colors.textSecondary }}>
               {isSuper ? 'Super Admin' : 'Admin'}
             </p>
           </div>
         </div>
 
         {/* Navigation */}
-        <ul className="nav-menu">
-          <li className="nav-item">
+        <nav style={{ flex: 1 }}>
+          {[
+            { id: 'overview', icon: HomeIcon, label: 'Overview' },
+            { id: 'verifications', icon: FileIcon, label: 'Verifications', badge: verifications.length },
+            { id: 'loans', icon: DollarIcon, label: 'Loan Requests', badge: loanRequests.length },
+            ...(isSuper ? [{ id: 'admins', icon: UsersIcon, label: 'Admin Management' }] : []),
+            { id: 'analytics', icon: ChartIcon, label: 'Analytics' }
+          ].map(item => (
             <a
-              className={`nav-link ${activeSection === 'overview' ? 'active' : ''}`}
-              onClick={() => setActiveSection('overview')}
+              key={item.id}
+              onClick={() => setActiveSection(item.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.875rem 1rem',
+                marginBottom: '0.5rem',
+                color: activeSection === item.id ? 'white' : '#cbd5e1',
+                textDecoration: 'none',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontWeight: '500',
+                background: activeSection === item.id 
+                  ? 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)'
+                  : 'transparent',
+                boxShadow: activeSection === item.id 
+                  ? '0 4px 12px rgba(99, 102, 241, 0.3)'
+                  : 'none',
+                transition: 'all 0.2s ease'
+              }}
             >
-              <HomeIcon className="nav-icon" />
-              Overview
-            </a>
-          </li>
-
-          <li className="nav-item">
-            <a
-              className={`nav-link ${activeSection === 'verifications' ? 'active' : ''}`}
-              onClick={() => setActiveSection('verifications')}
-            >
-              <FileIcon className="nav-icon" />
-              Verifications
-              {verifications.length > 0 && (
-                <span className="badge badge-warning" style={{ marginLeft: 'auto' }}>
-                  {verifications.length}
+              <item.icon size={20} />
+              {item.label}
+              {item.badge > 0 && (
+                <span style={{
+                  marginLeft: 'auto',
+                  background: 'rgba(245, 158, 11, 0.2)',
+                  color: '#f59e0b',
+                  padding: '0.125rem 0.5rem',
+                  borderRadius: '9999px',
+                  fontSize: '0.75rem',
+                  fontWeight: '600'
+                }}>
+                  {item.badge}
                 </span>
               )}
             </a>
-          </li>
-
-          <li className="nav-item">
-            <a
-              className={`nav-link ${activeSection === 'loans' ? 'active' : ''}`}
-              onClick={() => setActiveSection('loans')}
-            >
-              <DollarIcon className="nav-icon" />
-              Loan Requests
-              {loanRequests.length > 0 && (
-                <span className="badge badge-info" style={{ marginLeft: 'auto' }}>
-                  {loanRequests.length}
-                </span>
-              )}
-            </a>
-          </li>
-
-          {isSuper && (
-            <li className="nav-item">
-              <a
-                className={`nav-link ${activeSection === 'admins' ? 'active' : ''}`}
-                onClick={() => setActiveSection('admins')}
-              >
-                <UsersIcon className="nav-icon" />
-                Admin Management
-              </a>
-            </li>
-          )}
-
-          <li className="nav-item">
-            <a
-              className={`nav-link ${activeSection === 'analytics' ? 'active' : ''}`}
-              onClick={() => setActiveSection('analytics')}
-            >
-              <ChartIcon className="nav-icon" />
-              Analytics
-            </a>
-          </li>
-        </ul>
+          ))}
+        </nav>
 
         {/* Footer Actions */}
-        <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
-          <a className="nav-link" onClick={exportExcel}>
-            <DownloadIcon className="nav-icon" />
+        <div style={{ paddingTop: '1rem', borderTop: `1px solid ${colors.border}` }}>
+          <a onClick={exportExcel} style={{
+            display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem',
+            color: colors.textSecondary, cursor: 'pointer', borderRadius: '0.5rem', marginBottom: '0.5rem'
+          }}>
+            <DownloadIcon size={20} />
             Export Excel
           </a>
-          <a className="nav-link" onClick={logout}>
-            <LogoutIcon className="nav-icon" />
+          <a onClick={logout} style={{
+            display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem',
+            color: '#ef4444', cursor: 'pointer', borderRadius: '0.5rem'
+          }}>
+            <LogoutIcon size={20} />
             Logout
           </a>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="dashboard-main">
+      <div style={{
+        flex: 1,
+        marginLeft: sidebarOpen ? '280px' : '0',
+        padding: '2rem',
+        transition: 'margin-left 0.3s ease'
+      }}>
         {/* Header */}
-        <div className="dashboard-header">
-          <div className="flex-between">
-            <div>
-              <h1 className="dashboard-title">
-                {activeSection === 'overview' && 'Dashboard Overview'}
-                {activeSection === 'verifications' && 'KYC Verifications'}
-                {activeSection === 'loans' && 'Loan Requests'}
-                {activeSection === 'admins' && 'Admin Management'}
-                {activeSection === 'analytics' && 'Analytics & Reports'}
-              </h1>
-              <p className="dashboard-subtitle">Welcome back, {user.name}</p>
-            </div>
-            <button className="btn btn-sm btn-secondary" onClick={() => setSidebarOpen(!sidebarOpen)}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '2rem',
+          paddingBottom: '1.5rem',
+          borderBottom: `1px solid ${colors.border}`
+        }}>
+          <div>
+            <h1 style={{ fontSize: '2rem', fontWeight: '800', color: colors.textPrimary, margin: 0 }}>
+              {activeSection === 'overview' && 'Dashboard Overview'}
+              {activeSection === 'verifications' && 'KYC Verifications'}
+              {activeSection === 'loans' && 'Loan Requests'}
+              {activeSection === 'admins' && 'Admin Management'}
+              {activeSection === 'analytics' && 'Analytics & Reports'}
+            </h1>
+            <p style={{ color: colors.textSecondary, margin: '0.5rem 0 0 0' }}>Welcome back, {user.name}</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button 
+              onClick={toggleTheme}
+              style={{
+                padding: '0.5rem',
+                background: colors.bgCard,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                color: colors.textSecondary
+              }}
+            >
+              {theme === 'dark' ? <SunIcon size={20} /> : <MoonIcon size={20} />}
+            </button>
+            <button 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{
+                padding: '0.5rem',
+                background: colors.bgCard,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                color: colors.textSecondary
+              }}
+            >
               <MenuIcon size={20} />
             </button>
           </div>
@@ -269,87 +354,225 @@ function AdminDashboard() {
 
         {/* Overview Section */}
         {activeSection === 'overview' && (
-          <div className="fade-in">
+          <div>
             {/* Stats Cards */}
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-header">
-                  <div>
-                    <div className="stat-value">{verifications.length}</div>
-                    <div className="stat-label">Pending KYC</div>
-                  </div>
-                  <div className="stat-icon">
-                    <FileIcon size={24} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-header">
-                  <div>
-                    <div className="stat-value">{loanRequests.length}</div>
-                    <div className="stat-label">Pending Loans</div>
-                  </div>
-                  <div className="stat-icon">
-                    <DollarIcon size={24} />
-                  </div>
-                </div>
-              </div>
-
-              {isSuper && (
-                <div className="stat-card">
-                  <div className="stat-header">
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: '1.5rem',
+              marginBottom: '2rem'
+            }}>
+              {[
+                { value: verifications.length, label: 'Pending KYC', icon: FileIcon, color: '#6366f1' },
+                { value: loanRequests.length, label: 'Pending Loans', icon: DollarIcon, color: '#10b981' },
+                ...(isSuper ? [{ value: admins.length, label: 'Total Admins', icon: UsersIcon, color: '#f59e0b' }] : []),
+                { value: verifications.length + loanRequests.length, label: 'Total Pending', icon: AlertIcon, color: '#ef4444' }
+              ].map((stat, idx) => (
+                <div key={idx} style={{
+                  background: 'rgba(30, 30, 56, 0.7)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '1rem',
+                  padding: '1.5rem',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, height: '4px',
+                    background: `linear-gradient(90deg, ${stat.color} 0%, ${stat.color}88 100%)`
+                  }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <div className="stat-value">{admins.length}</div>
-                      <div className="stat-label">Total Admins</div>
+                      <div style={{ fontSize: '2rem', fontWeight: '800', color: '#f1f5f9' }}>{stat.value}</div>
+                      <div style={{ color: '#94a3b8', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        {stat.label}
+                      </div>
                     </div>
-                    <div className="stat-icon">
-                      <UsersIcon size={24} />
+                    <div style={{
+                      width: '48px', height: '48px', borderRadius: '0.75rem',
+                      background: `${stat.color}20`, color: stat.color,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      <stat.icon size={24} />
                     </div>
                   </div>
                 </div>
-              )}
+              ))}
+            </div>
 
-              <div className="stat-card">
-                <div className="stat-header">
-                  <div>
-                    <div className="stat-value">{verifications.length + loanRequests.length}</div>
-                    <div className="stat-label">Total Pending</div>
+            {/* Charts Section */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+              
+              {/* KYC Status Donut Chart */}
+              <div style={{
+                background: 'rgba(30, 30, 56, 0.7)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '1rem',
+                padding: '1.5rem'
+              }}>
+                <h3 style={{ color: '#f1f5f9', marginBottom: '1.5rem', fontSize: '1rem', fontWeight: '600' }}>KYC Status Distribution</h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2rem' }}>
+                  {/* Simple CSS Donut Chart */}
+                  <div style={{
+                    width: '120px',
+                    height: '120px',
+                    borderRadius: '50%',
+                    background: verifications.length === 0 
+                      ? 'rgba(100, 116, 139, 0.3)'
+                      : `conic-gradient(#f59e0b 0deg 360deg)`,
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <div style={{
+                      width: '70px',
+                      height: '70px',
+                      borderRadius: '50%',
+                      background: 'rgba(30, 30, 56, 1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexDirection: 'column'
+                    }}>
+                      <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#f1f5f9' }}>
+                        {verifications.length}
+                      </div>
+                      <div style={{ fontSize: '0.625rem', color: '#94a3b8' }}>PENDING</div>
+                    </div>
                   </div>
-                  <div className="stat-icon">
-                    <AlertIcon size={24} />
+                  {/* Legend */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {[
+                      { label: 'Approved', color: '#10b981', value: 0 },
+                      { label: 'Pending', color: '#f59e0b', value: verifications.length },
+                      { label: 'Rejected', color: '#ef4444', value: 0 }
+                    ].map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: item.color }} />
+                        <span style={{ color: '#94a3b8', fontSize: '0.8125rem' }}>{item.label}</span>
+                        <span style={{ color: '#f1f5f9', fontWeight: '600', fontSize: '0.8125rem', marginLeft: 'auto' }}>{item.value}</span>
+                      </div>
+                    ))}
                   </div>
+                </div>
+              </div>
+
+              {/* Loans Bar Chart */}
+              <div style={{
+                background: 'rgba(30, 30, 56, 0.7)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '1rem',
+                padding: '1.5rem'
+              }}>
+                <h3 style={{ color: '#f1f5f9', marginBottom: '1.5rem', fontSize: '1rem', fontWeight: '600' }}>Loan Requests (Last 6 Months)</h3>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100px', gap: '0.5rem' }}>
+                  {[
+                    { month: 'Jul', value: 0 },
+                    { month: 'Aug', value: 0 },
+                    { month: 'Sep', value: 0 },
+                    { month: 'Oct', value: 0 },
+                    { month: 'Nov', value: 0 },
+                    { month: 'Dec', value: loanRequests.length }
+                  ].map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+                      <div style={{
+                        width: '100%',
+                        height: item.value > 0 ? `${Math.min(item.value * 10, 100)}%` : '4px',
+                        background: item.value > 0 
+                          ? 'linear-gradient(180deg, #6366f1 0%, #4f46e5 100%)'
+                          : 'rgba(100, 116, 139, 0.3)',
+                        borderRadius: '0.25rem 0.25rem 0 0',
+                        minHeight: '4px',
+                        transition: 'height 0.3s ease'
+                      }} />
+                      <span style={{ color: '#94a3b8', fontSize: '0.6875rem', marginTop: '0.5rem' }}>{item.month}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ textAlign: 'center', marginTop: '1rem', color: '#64748b', fontSize: '0.75rem' }}>
+                  Total: {loanRequests.length} pending request{loanRequests.length !== 1 ? 's' : ''}
                 </div>
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="card">
-              <div className="card-header">
-                <h3 className="card-title">Quick Actions</h3>
+            {/* Recent Activity Feed */}
+            <div style={{
+              background: 'rgba(30, 30, 56, 0.7)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '1rem',
+              padding: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h3 style={{ color: '#f1f5f9', fontSize: '1rem', fontWeight: '600', margin: 0 }}>Recent Activity</h3>
               </div>
-              <div className="card-body">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                  <button className="btn btn-primary" onClick={() => setActiveSection('verifications')}>
-                    <FileIcon size={20} />
-                    Review KYC ({verifications.length})
-                  </button>
-                  <button className="btn btn-primary" onClick={() => setActiveSection('loans')}>
-                    <DollarIcon size={20} />
-                    Review Loans ({loanRequests.length})
-                  </button>
-                  {isSuper && (
-                    <button className="btn btn-success" onClick={() => {setShowModal(true); setActiveSection('admins');}}>
-                      <UsersIcon size={20} />
-                      Add Admin
-                    </button>
-                  )}
-                  <button className="btn btn-secondary" onClick={exportExcel}>
-                    <DownloadIcon size={20} />
-                    Export Data
-                  </button>
+              {(verifications.length === 0 && loanRequests.length === 0) ? (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '2rem',
+                  color: '#64748b'
+                }}>
+                  <AlertIcon size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                  <p style={{ margin: 0, fontSize: '0.875rem' }}>No recent activity yet</p>
+                  <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#475569' }}>
+                    Activity will appear here when customers submit KYC documents or loan requests
+                  </p>
                 </div>
-              </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {verifications.map((v, idx) => (
+                    <div key={`kyc-${idx}`} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      padding: '0.875rem',
+                      background: 'rgba(15, 15, 30, 0.4)',
+                      borderRadius: '0.75rem',
+                      border: '1px solid rgba(255,255,255,0.04)'
+                    }}>
+                      <div style={{
+                        width: '40px', height: '40px', borderRadius: '0.5rem',
+                        background: '#6366f120', color: '#6366f1',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                      }}>
+                        <FileIcon size={20} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: '#f1f5f9', fontSize: '0.875rem', fontWeight: '500' }}>KYC verification pending</div>
+                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{v.name || v.email}</div>
+                      </div>
+                      <div style={{ color: '#f59e0b', fontSize: '0.75rem', fontWeight: '500' }}>Pending</div>
+                    </div>
+                  ))}
+                  {loanRequests.map((loan, idx) => (
+                    <div key={`loan-${idx}`} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      padding: '0.875rem',
+                      background: 'rgba(15, 15, 30, 0.4)',
+                      borderRadius: '0.75rem',
+                      border: '1px solid rgba(255,255,255,0.04)'
+                    }}>
+                      <div style={{
+                        width: '40px', height: '40px', borderRadius: '0.5rem',
+                        background: '#10b98120', color: '#10b981',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                      }}>
+                        <DollarIcon size={20} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: '#f1f5f9', fontSize: '0.875rem', fontWeight: '500' }}>Loan request - ${loan.amount?.toLocaleString()}</div>
+                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{loan.customer_name}</div>
+                      </div>
+                      <div style={{ color: '#f59e0b', fontSize: '0.75rem', fontWeight: '500' }}>Pending</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

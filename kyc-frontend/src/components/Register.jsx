@@ -108,17 +108,18 @@ function Register() {
   return (
     <div 
       style={{
-        minHeight: '100vh',
-        width: '100vw',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         background: colors.bg,
-        margin: 0,
-        padding: '2rem 1rem',
+        padding: '1rem',
         transition: 'background 0.3s ease',
-        overflowY: 'auto',
-        overflowX: 'hidden'
+        overflow: 'auto'
       }}
     >
       {/* Theme Toggle */}
@@ -204,7 +205,7 @@ function Register() {
                   name="first_name"
                   value={formData.first_name}
                   onChange={handleChange}
-                  placeholder="John"
+                  placeholder="Asharib"
                   required
                   style={inputStyle}
                 />
@@ -221,7 +222,7 @@ function Register() {
                   name="last_name"
                   value={formData.last_name}
                   onChange={handleChange}
-                  placeholder="Doe"
+                  placeholder="khan"
                   required
                   style={inputStyle}
                 />
@@ -364,7 +365,7 @@ function Register() {
           color: colors.textMuted,
           textAlign: 'center'
         }}>
-          🔒 Your data is encrypted with AES-256 and passwords are hashed with Argon2
+          Your identity is protected with bank-grade encrypted verification
         </div>
       </div>
 
