@@ -16,6 +16,7 @@ kyc-backend/uploads/*
 kyc-backend/admin_exports/*
 kyc-backend/reports/*
 kyc-backend/secret.key
+secret.key
 
 # Database (optional - keep in repo for student project)
 # kyc-backend/db/*.accdb
