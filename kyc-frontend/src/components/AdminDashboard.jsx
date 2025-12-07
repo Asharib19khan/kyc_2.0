@@ -5,6 +5,7 @@ import {
   SettingsIcon, LogoutIcon, CheckIcon, XIcon, DownloadIcon,
   ShieldIcon, AlertIcon, MenuIcon, SunIcon, MoonIcon
 } from './Icons';
+import { toast } from 'react-hot-toast';
 
 function AdminDashboard() {
   const [activeSection, setActiveSection] = useState('overview');
@@ -16,6 +17,11 @@ function AdminDashboard() {
   const [showModal, setShowModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [theme, setTheme] = useState('dark');
+  const [showHistory, setShowHistory] = useState(false); // New state for history toggle
+  
+  // New State for Note Modal
+  const [noteModal, setNoteModal] = useState({ show: false, loanId: null, action: null });
+  const [noteText, setNoteText] = useState('');
 
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -29,6 +35,11 @@ function AdminDashboard() {
     setTheme(savedTheme);
     document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
+
+  // Refetch when showHistory toggles
+  useEffect(() => {
+    fetchData();
+  }, [showHistory]);
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
@@ -63,16 +74,15 @@ function AdminDashboard() {
   const fetchData = () => {
     const headers = { 'Authorization': localStorage.getItem('token') };
 
-    fetch('http://localhost:5000/admin/verification-requests', { headers })
+    fetch(`http://localhost:5000/admin/verification-requests?show_history=${showHistory}`, { headers })
       .then(res => res.json())
       .then(data => {
         if (data.success) {
           setVerifications(data.data);
-          // Calculate stats
           setStats(prev => ({
             ...prev,
-            pending: data.data.length,
-            users: data.data.length  // This could be total users from another endpoint
+            pending: data.data.filter(v => v.status === 'pending').length,
+            users: data.data.length 
           }));
         }
       });
@@ -111,7 +121,7 @@ function AdminDashboard() {
     setNewAdmin({ first: '', last: '', email: '', password: '' });
     setShowModal(false);
     fetchData();
-    alert('✅ Admin created successfully!');
+    toast.success('Admin created successfully!');
   };
 
   const deleteAdmin = async (id) => {
@@ -125,7 +135,7 @@ function AdminDashboard() {
       body: JSON.stringify({ admin_id: id })
     });
     fetchData();
-    alert('✅ Admin deleted successfully!');
+    toast.success('Admin deleted successfully!');
   };
 
   const verifyUser = async (user_id, action) => {
@@ -138,23 +148,35 @@ function AdminDashboard() {
       body: JSON.stringify({ user_id, action })
     });
     fetchData();
-    alert(`✅ User ${action}d successfully!`);
+    toast.success(`User ${action}d successfully!`);
   };
 
-  const decideLoan = async (loan_id, decision) => {
+  // Replaces the old direct prompt
+  const openNoteModal = (loan_id, action) => {
+    setNoteModal({ show: true, loanId: loan_id, action });
+    setNoteText('');
+  };
+
+  const submitLoanDecision = async (e) => {
+    e.preventDefault();
+    const { loanId, action } = noteModal;
+    
+    // Close modal immediately
+    setNoteModal({ show: false, loanId: null, action: null });
+
     const res = await fetch('http://localhost:5000/admin/loan-decision', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': localStorage.getItem('token')
       },
-      body: JSON.stringify({ loan_id, decision })
+      body: JSON.stringify({ loan_id: loanId, decision: action, notes: noteText })
     });
     const data = await res.json();
-    if (data.success && data.download_url) {
-      window.open('http://localhost:5000' + data.download_url, '_blank');
+    
+    if (data.success) {
       fetchData();
-      alert(`✅ Loan ${decision}d! PDF downloaded.`);
+      toast.success(`Loan ${action}d!`);
     }
   };
 
@@ -165,7 +187,7 @@ function AdminDashboard() {
     const data = await res.json();
     if (data.success) {
       window.open('http://localhost:5000' + data.download_url, '_blank');
-      alert('✅ Excel report downloaded!');
+      toast.success(`${type === 'customers' ? 'Customer' : 'Loan'} data exported to CSV!`);
     }
   };
 
@@ -383,8 +405,8 @@ function AdminDashboard() {
                   }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <div style={{ fontSize: '2rem', fontWeight: '800', color: '#f1f5f9' }}>{stat.value}</div>
-                      <div style={{ color: '#94a3b8', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <div style={{ fontSize: '2rem', fontWeight: '800', color: colors.textPrimary }}>{stat.value}</div>
+                      <div style={{ color: colors.textSecondary, fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         {stat.label}
                       </div>
                     </div>
@@ -405,13 +427,14 @@ function AdminDashboard() {
               
               {/* KYC Status Donut Chart */}
               <div style={{
-                background: 'rgba(30, 30, 56, 0.7)',
+                background: colors.bgCard,
                 backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                border: `1px solid ${colors.border}`,
                 borderRadius: '1rem',
-                padding: '1.5rem'
+                padding: '1.5rem',
+                boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
               }}>
-                <h3 style={{ color: '#f1f5f9', marginBottom: '1.5rem', fontSize: '1rem', fontWeight: '600' }}>KYC Status Distribution</h3>
+                <h3 style={{ color: colors.textPrimary, marginBottom: '1.5rem', fontSize: '1rem', fontWeight: '600' }}>KYC Status Distribution</h3>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2rem' }}>
                   {/* Simple CSS Donut Chart */}
                   <div style={{
@@ -430,16 +453,16 @@ function AdminDashboard() {
                       width: '70px',
                       height: '70px',
                       borderRadius: '50%',
-                      background: 'rgba(30, 30, 56, 1)',
+                      background: theme === 'dark' ? 'rgba(30, 30, 56, 1)' : '#f8fafc',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexDirection: 'column'
                     }}>
-                      <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#f1f5f9' }}>
+                      <div style={{ fontSize: '1.25rem', fontWeight: '700', color: colors.textPrimary }}>
                         {verifications.length}
                       </div>
-                      <div style={{ fontSize: '0.625rem', color: '#94a3b8' }}>PENDING</div>
+                      <div style={{ fontSize: '0.625rem', color: colors.textSecondary }}>PENDING</div>
                     </div>
                   </div>
                   {/* Legend */}
@@ -461,13 +484,14 @@ function AdminDashboard() {
 
               {/* Loans Bar Chart */}
               <div style={{
-                background: 'rgba(30, 30, 56, 0.7)',
+                background: colors.bgCard,
                 backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                border: `1px solid ${colors.border}`,
                 borderRadius: '1rem',
-                padding: '1.5rem'
+                padding: '1.5rem',
+                boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
               }}>
-                <h3 style={{ color: '#f1f5f9', marginBottom: '1.5rem', fontSize: '1rem', fontWeight: '600' }}>Loan Requests (Last 6 Months)</h3>
+                <h3 style={{ color: colors.textPrimary, marginBottom: '1.5rem', fontSize: '1rem', fontWeight: '600' }}>Loan Requests (Last 6 Months)</h3>
                 <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100px', gap: '0.5rem' }}>
                   {[
                     { month: 'Jul', value: 0 },
@@ -488,11 +512,11 @@ function AdminDashboard() {
                         minHeight: '4px',
                         transition: 'height 0.3s ease'
                       }} />
-                      <span style={{ color: '#94a3b8', fontSize: '0.6875rem', marginTop: '0.5rem' }}>{item.month}</span>
+                      <span style={{ color: colors.textSecondary, fontSize: '0.6875rem', marginTop: '0.5rem' }}>{item.month}</span>
                     </div>
                   ))}
                 </div>
-                <div style={{ textAlign: 'center', marginTop: '1rem', color: '#64748b', fontSize: '0.75rem' }}>
+                <div style={{ textAlign: 'center', marginTop: '1rem', color: colors.textMuted, fontSize: '0.75rem' }}>
                   Total: {loanRequests.length} pending request{loanRequests.length !== 1 ? 's' : ''}
                 </div>
               </div>
@@ -500,20 +524,21 @@ function AdminDashboard() {
 
             {/* Recent Activity Feed */}
             <div style={{
-              background: 'rgba(30, 30, 56, 0.7)',
+              background: colors.bgCard,
               backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: `1px solid ${colors.border}`,
               borderRadius: '1rem',
-              padding: '1.5rem'
+              padding: '1.5rem',
+              boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                <h3 style={{ color: '#f1f5f9', fontSize: '1rem', fontWeight: '600', margin: 0 }}>Recent Activity</h3>
+                <h3 style={{ color: colors.textPrimary, fontSize: '1rem', fontWeight: '600', margin: 0 }}>Recent Activity</h3>
               </div>
               {(verifications.length === 0 && loanRequests.length === 0) ? (
                 <div style={{ 
                   textAlign: 'center', 
                   padding: '2rem',
-                  color: '#64748b'
+                  color: colors.textMuted
                 }}>
                   <AlertIcon size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
                   <p style={{ margin: 0, fontSize: '0.875rem' }}>No recent activity yet</p>
@@ -529,20 +554,20 @@ function AdminDashboard() {
                       alignItems: 'center',
                       gap: '1rem',
                       padding: '0.875rem',
-                      background: 'rgba(15, 15, 30, 0.4)',
+                      background: colors.bgInput,
                       borderRadius: '0.75rem',
-                      border: '1px solid rgba(255,255,255,0.04)'
+                      border: `1px solid ${colors.border}`
                     }}>
                       <div style={{
                         width: '40px', height: '40px', borderRadius: '0.5rem',
-                        background: '#6366f120', color: '#6366f1',
+                        background: 'rgba(99, 102, 241, 0.15)', color: '#6366f1',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
                       }}>
                         <FileIcon size={20} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: '#f1f5f9', fontSize: '0.875rem', fontWeight: '500' }}>KYC verification pending</div>
-                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{v.name || v.email}</div>
+                        <div style={{ color: colors.textPrimary, fontSize: '0.875rem', fontWeight: '500' }}>KYC verification pending</div>
+                        <div style={{ color: colors.textMuted, fontSize: '0.75rem' }}>{v.name || v.email}</div>
                       </div>
                       <div style={{ color: '#f59e0b', fontSize: '0.75rem', fontWeight: '500' }}>Pending</div>
                     </div>
@@ -553,20 +578,20 @@ function AdminDashboard() {
                       alignItems: 'center',
                       gap: '1rem',
                       padding: '0.875rem',
-                      background: 'rgba(15, 15, 30, 0.4)',
+                      background: colors.bgInput,
                       borderRadius: '0.75rem',
-                      border: '1px solid rgba(255,255,255,0.04)'
+                      border: `1px solid ${colors.border}`
                     }}>
                       <div style={{
                         width: '40px', height: '40px', borderRadius: '0.5rem',
-                        background: '#10b98120', color: '#10b981',
+                        background: 'rgba(16, 185, 129, 0.15)', color: '#10b981',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
                       }}>
                         <DollarIcon size={20} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: '#f1f5f9', fontSize: '0.875rem', fontWeight: '500' }}>Loan request - ${loan.amount?.toLocaleString()}</div>
-                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{loan.customer_name}</div>
+                        <div style={{ color: colors.textPrimary, fontSize: '0.875rem', fontWeight: '500' }}>Loan request - ${loan.amount?.toLocaleString()}</div>
+                        <div style={{ color: colors.textMuted, fontSize: '0.75rem' }}>{loan.customer_name}</div>
                       </div>
                       <div style={{ color: '#f59e0b', fontSize: '0.75rem', fontWeight: '500' }}>Pending</div>
                     </div>
@@ -580,66 +605,132 @@ function AdminDashboard() {
         {/* Verifications Section */}
         {activeSection === 'verifications' && (
           <div className="fade-in">
-            {verifications.length === 0 ? (
-              <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-                <FileIcon size={64} style={{ margin: '0 auto 1rem', color: 'var(--color-text-muted)' }} />
-                <h3>No Pending Verifications</h3>
-                <p style={{ color: 'var(--color-text-muted)' }}>All KYC requests have been processed</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.5rem', margin: 0, color: colors.textPrimary }}>
+                {showHistory ? 'Verification History' : 'Pending Verifications'}
+              </h2>
+              <button 
+                onClick={() => setShowHistory(!showHistory)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: showHistory ? colors.bgCard : 'rgba(99, 102, 241, 0.1)',
+                  color: showHistory ? colors.textSecondary : '#6366f1',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.875rem'
+                }}
+              >
+                {showHistory ? 'Show Pending' : 'Show History'}
+              </button>
+            </div>
+
+            {verifications.filter(v => showHistory ? v.status !== 'pending' : v.status === 'pending').length === 0 ? (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '3rem', 
+                background: colors.bgCard,
+                borderRadius: '1rem',
+                border: `1px solid ${colors.border}`,
+                boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
+              }}>
+                <FileIcon size={64} style={{ margin: '0 auto 1rem', color: colors.textMuted }} />
+                <h3 style={{ color: colors.textPrimary }}>
+                  {showHistory ? 'No Verification History' : 'No Pending Verifications'}
+                </h3>
+                <p style={{ color: colors.textMuted }}>
+                  {showHistory ? 'No past verifications found' : 'All users have been processed'}
+                </p>
               </div>
             ) : (
-              <div className="table-container">
-                <table className="table">
+              <div style={{ 
+                background: colors.bgCard,
+                borderRadius: '1rem',
+                border: `1px solid ${colors.border}`,
+                overflow: 'hidden',
+                boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr>
-                      <th>Customer</th>
-                      <th>Documents</th>
-                      <th>Status</th>
-                      <th>Actions</th>
+                    <tr style={{ borderBottom: `1px solid ${colors.border}`, background: colors.bgSecondary }}>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Customer</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Documents</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Status</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>
+                        {showHistory ? 'Processed By' : 'Actions'}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {verifications.map(req => (
-                      <tr key={req.user_id}>
-                        <td>
-                          <div><strong>{req.name}</strong></div>
-                          <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>{req.email}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{req.phone}</div>
+                    {verifications.filter(v => showHistory ? v.status !== 'pending' : v.status === 'pending').map(req => (
+                      <tr key={req.user_id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ color: colors.textPrimary, fontWeight: '600' }}>{req.name}</div>
+                          <div style={{ fontSize: '0.875rem', color: colors.textSecondary }}>{req.email}</div>
+                          <div style={{ fontSize: '0.75rem', color: colors.textMuted }}>{req.phone}</div>
                         </td>
-                        <td>
+                        <td style={{ padding: '1rem' }}>
                           {req.documents.length === 0 ? (
-                            <span className="badge badge-warning">No Docs</span>
+                            <span style={{ 
+                              padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600',
+                              background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b'
+                            }}>No Docs</span>
                           ) : (
                             req.documents.map((doc, idx) => (
                               <div key={idx} style={{ marginBottom: '0.25rem' }}>
                                 <a
                                   href="#"
                                   onClick={(e) => { e.preventDefault(); viewDocument(doc.path); }}
-                                  style={{ color: 'var(--color-primary)', textDecoration: 'none' }}
+                                  style={{ color: '#6366f1', textDecoration: 'none', marginRight: '0.5rem', fontSize: '0.875rem' }}
                                 >
                                   {doc.type}
                                 </a>
-                                {' '}
-                                <span className={`badge badge-${doc.status === 'pending' ? 'warning' : 'success'}`}>
+                                <span style={{
+                                  padding: '0.125rem 0.5rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: '600',
+                                  background: doc.status === 'pending' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                                  color: doc.status === 'pending' ? '#f59e0b' : '#10b981'
+                                }}>
                                   {doc.status}
                                 </span>
                               </div>
                             ))
                           )}
                         </td>
-                        <td>
-                          <span className="badge badge-warning">{req.status}</span>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{
+                            padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600',
+                            background: req.status === 'pending' ? 'rgba(245, 158, 11, 0.2)' : 
+                                       req.status === 'verified' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                            color: req.status === 'pending' ? '#f59e0b' : 
+                                   req.status === 'verified' ? '#10b981' : '#ef4444'
+                          }}>
+                            {req.status === 'verified' ? 'Approved' : req.status === 'pending' ? 'Pending' : 'Rejected'}
+                          </span>
                         </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button className="btn btn-sm btn-success" onClick={() => verifyUser(req.user_id, 'approve')}>
-                              <CheckIcon size={16} />
-                              Approve
-                            </button>
-                            <button className="btn btn-sm btn-danger" onClick={() => verifyUser(req.user_id, 'reject')}>
-                              <XIcon size={16} />
-                              Reject
-                            </button>
-                          </div>
+                        <td style={{ padding: '1rem' }}>
+                          {!showHistory ? (
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button onClick={() => verifyUser(req.user_id, 'approve')} style={{
+                                display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.375rem 0.75rem',
+                                background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: 'none', borderRadius: '0.375rem',
+                                cursor: 'pointer', fontSize: '0.875rem', fontWeight: '500'
+                              }}>
+                                <CheckIcon size={14} /> Approve
+                              </button>
+                              <button onClick={() => verifyUser(req.user_id, 'reject')} style={{
+                                display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.375rem 0.75rem',
+                                background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: 'none', borderRadius: '0.375rem',
+                                cursor: 'pointer', fontSize: '0.875rem', fontWeight: '500'
+                              }}>
+                                <XIcon size={14} /> Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ color: colors.textSecondary, fontSize: '0.875rem' }}>
+                              Admin
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -654,44 +745,63 @@ function AdminDashboard() {
         {activeSection === 'loans' && (
           <div className="fade-in">
             {loanRequests.length === 0 ? (
-              <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-                <DollarIcon size={64} style={{ margin: '0 auto 1rem', color: 'var(--color-text-muted)' }} />
-                <h3>No Pending Loan Requests</h3>
-                <p style={{ color: 'var(--color-text-muted)' }}>All loan applications have been processed</p>
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '3rem', 
+                background: colors.bgCard,
+                borderRadius: '1rem',
+                border: `1px solid ${colors.border}`,
+                boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
+              }}>
+                <DollarIcon size={64} style={{ margin: '0 auto 1rem', color: colors.textMuted }} />
+                <h3 style={{ color: colors.textPrimary }}>No Pending Loan Requests</h3>
+                <p style={{ color: colors.textMuted }}>All loan applications have been processed</p>
               </div>
             ) : (
-              <div className="table-container">
-                <table className="table">
+              <div style={{ 
+                background: colors.bgCard,
+                borderRadius: '1rem',
+                border: `1px solid ${colors.border}`,
+                overflow: 'hidden',
+                boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Customer</th>
-                      <th>Amount</th>
-                      <th>Term</th>
-                      <th>Purpose</th>
-                      <th>Actions</th>
+                    <tr style={{ borderBottom: `1px solid ${colors.border}`, background: colors.bgSecondary }}>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>ID</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Customer</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Amount</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Term</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Purpose</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loanRequests.map(loan => (
-                      <tr key={loan.loan_id}>
-                        <td><strong>#{loan.loan_id}</strong></td>
-                        <td>
-                          <div><strong>{loan.customer_name}</strong></div>
-                          <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>{loan.email}</div>
+                      <tr key={loan.loan_id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                        <td style={{ padding: '1rem', color: colors.textPrimary }}><strong>#{loan.loan_id}</strong></td>
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ color: colors.textPrimary, fontWeight: '600' }}>{loan.customer_name}</div>
+                          <div style={{ fontSize: '0.875rem', color: colors.textSecondary }}>{loan.email}</div>
                         </td>
-                        <td><strong style={{ color: 'var(--color-success)' }}>${loan.amount.toLocaleString()}</strong></td>
-                        <td>{loan.term} months</td>
-                        <td>{loan.purpose}</td>
-                        <td>
+                        <td style={{ padding: '1rem' }}><strong style={{ color: '#10b981' }}>${loan.amount.toLocaleString()}</strong></td>
+                        <td style={{ padding: '1rem', color: colors.textSecondary }}>{loan.term} months</td>
+                        <td style={{ padding: '1rem', color: colors.textSecondary }}>{loan.purpose}</td>
+                        <td style={{ padding: '1rem' }}>
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button className="btn btn-sm btn-success" onClick={() => decideLoan(loan.loan_id, 'approve')}>
-                              <CheckIcon size={16} />
-                              Approve
+                            <button onClick={() => openNoteModal(loan.loan_id, 'approve')} style={{
+                              display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.375rem 0.75rem',
+                              background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: 'none', borderRadius: '0.375rem',
+                              cursor: 'pointer', fontSize: '0.875rem', fontWeight: '500'
+                            }}>
+                              <CheckIcon size={14} /> Approve
                             </button>
-                            <button className="btn btn-sm btn-danger" onClick={() => decideLoan(loan.loan_id, 'reject')}>
-                              <XIcon size={16} />
-                              Reject
+                            <button onClick={() => openNoteModal(loan.loan_id, 'reject')} style={{
+                              display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.375rem 0.75rem',
+                              background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: 'none', borderRadius: '0.375rem',
+                              cursor: 'pointer', fontSize: '0.875rem', fontWeight: '500'
+                            }}>
+                              <XIcon size={14} /> Reject
                             </button>
                           </div>
                         </td>
@@ -708,38 +818,48 @@ function AdminDashboard() {
         {activeSection === 'admins' && isSuper && (
           <div className="fade-in">
             <div style={{ marginBottom: '2rem' }}>
-              <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+              <button onClick={() => setShowModal(true)} style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', color: 'white',
+                border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '600'
+              }}>
                 <UsersIcon size={20} />
                 Add New Admin
               </button>
             </div>
 
-            <div className="grid grid-3">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
               {admins.map(admin => (
-                <div key={admin.id} className="card glass-hover" style={{ padding: '1.5rem' }}>
-                  <div className="flex-between" style={{ marginBottom: '1rem' }}>
+                <div key={admin.id} style={{ 
+                  padding: '1.5rem', 
+                  background: colors.bgCard, 
+                  borderRadius: '1rem',
+                  border: `1px solid ${colors.border}`,
+                  boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                     <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      fontSize: '1.25rem',
-                      fontWeight: 'bold'
+                      width: '48px', height: '48px', borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'white', fontSize: '1.25rem', fontWeight: 'bold'
                     }}>
                       {admin.name.charAt(0)}
                     </div>
-                    <button className="btn btn-sm btn-danger" onClick={() => deleteAdmin(admin.id)}>
+                    <button onClick={() => deleteAdmin(admin.id)} style={{
+                      background: 'none', border: 'none', color: '#ef4444', 
+                      cursor: 'pointer', padding: '0.25rem'
+                    }}>
                       <XIcon size={16} />
                     </button>
                   </div>
-                  <h4 style={{ margin: '0 0 0.25rem 0' }}>{admin.name}</h4>
-                  <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>{admin.email}</p>
+                  <h4 style={{ margin: '0 0 0.25rem 0', color: colors.textPrimary }}>{admin.name}</h4>
+                  <p style={{ margin: 0, fontSize: '0.875rem', color: colors.textSecondary }}>{admin.email}</p>
                   <div style={{ marginTop: '1rem' }}>
-                    <span className="badge badge-success">Active</span>
+                    <span style={{
+                      padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600',
+                      background: 'rgba(16, 185, 129, 0.15)', color: '#10b981'
+                    }}>Active</span>
                   </div>
                 </div>
               ))}
@@ -758,31 +878,60 @@ function AdminDashboard() {
         {/* Analytics Section */}
         {activeSection === 'analytics' && (
           <div className="fade-in">
-            <div className="card">
-              <div className="card-header">
-                <h3 className="card-title">System Analytics</h3>
+            <div style={{ 
+              background: colors.bgCard, 
+              borderRadius: '1rem', 
+              border: `1px solid ${colors.border}`,
+              overflow: 'hidden',
+              boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
+            }}>
+              <div style={{ padding: '1.5rem', borderBottom: `1px solid ${colors.border}` }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', color: colors.textPrimary }}>System Analytics</h3>
               </div>
-              <div className="card-body">
-                <div className="stats-grid">
+              <div style={{ padding: '1.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
                   <div style={{ padding: '1.5rem', background: 'rgba(65, 105, 225, 0.1)', borderRadius: '1rem', border: '1px solid rgba(65, 105, 225, 0.2)' }}>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-primary)' }}>Total Verifications</h4>
-                    <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>{verifications.length}</p>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#6366f1' }}>Total Verifications</h4>
+                    <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0, color: colors.textPrimary }}>{verifications.length}</p>
                   </div>
                   <div style={{ padding: '1.5rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '1rem', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-success)' }}>Total Loans</h4>
-                    <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>{loanRequests.length}</p>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#10b981' }}>Total Loans</h4>
+                    <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0, color: colors.textPrimary }}>{loanRequests.length}</p>
                   </div>
                   {isSuper && (
                     <div style={{ padding: '1.5rem', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '1rem', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-                      <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-warning)' }}>Total Admins</h4>
-                      <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>{admins.length}</p>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: '#f59e0b' }}>Total Admins</h4>
+                      <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0, color: colors.textPrimary }}>{admins.length}</p>
                     </div>
                   )}
                 </div>
-                <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-                  <button className="btn btn-primary btn-lg" onClick={exportExcel}>
+                <div style={{ textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  <button onClick={exportExcel} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '1rem 2rem',
+                    background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', color: 'white',
+                    border: 'none', borderRadius: '0.75rem', fontSize: '1rem', fontWeight: '600',
+                    cursor: 'pointer', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
+                  }}>
                     <DownloadIcon size={20} />
-                    Download Full Report (Excel)
+                    Export Full Report (Excel)
+                  </button>
+                  <button onClick={() => exportCSV('customers')} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '1rem 2rem',
+                    background: colors.bgCard, color: colors.textPrimary,
+                    border: `1px solid ${colors.border}`, borderRadius: '0.75rem', fontSize: '1rem', fontWeight: '600',
+                    cursor: 'pointer', boxShadow: theme === 'light' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none'
+                  }}>
+                    <UsersIcon size={20} />
+                    Export Customers (CSV)
+                  </button>
+                  <button onClick={() => exportCSV('loans')} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '1rem 2rem',
+                    background: colors.bgCard, color: colors.textPrimary,
+                    border: `1px solid ${colors.border}`, borderRadius: '0.75rem', fontSize: '1rem', fontWeight: '600',
+                    cursor: 'pointer', boxShadow: theme === 'light' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none'
+                  }}>
+                    <DollarIcon size={20} />
+                    Export Loans (CSV)
                   </button>
                 </div>
               </div>
@@ -793,58 +942,160 @@ function AdminDashboard() {
 
       {/* Add Admin Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title">Add New Admin</h2>
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }} onClick={() => setShowModal(false)}>
+          <div style={{
+            background: colors.bgCard, width: '100%', maxWidth: '500px', borderRadius: '1.5rem',
+            border: `1px solid ${colors.border}`, padding: '2rem', margin: '1rem',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.3)', animation: 'slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ marginBottom: '1.5rem', borderBottom: `1px solid ${colors.border}`, paddingBottom: '1rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', color: colors.textPrimary }}>Add New Admin</h2>
             </div>
-            <div className="modal-body">
+            <div>
               <form onSubmit={handleCreateAdmin}>
-                <div className="form-group">
-                  <label>First Name</label>
-                  <input
-                    value={newAdmin.first}
-                    onChange={e => setNewAdmin({ ...newAdmin, first: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Last Name</label>
-                  <input
-                    value={newAdmin.last}
-                    onChange={e => setNewAdmin({ ...newAdmin, last: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Email</label>
+                {['first', 'last'].map(field => (
+                  <div key={field} style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.textSecondary, fontSize: '0.875rem' }}>
+                      {field.charAt(0).toUpperCase() + field.slice(1)} Name
+                    </label>
+                    <input
+                      value={newAdmin[field]}
+                      onChange={e => setNewAdmin({ ...newAdmin, [field]: e.target.value })}
+                      required
+                      style={{
+                        width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem',
+                        background: colors.bgInput, border: `1px solid ${colors.border}`,
+                        color: colors.textPrimary, outline: 'none', transition: 'all 0.2s',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+                ))}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.textSecondary, fontSize: '0.875rem' }}>Email</label>
                   <input
                     type="email"
                     value={newAdmin.email}
                     onChange={e => setNewAdmin({ ...newAdmin, email: e.target.value })}
                     required
+                    style={{
+                      width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem',
+                      background: colors.bgInput, border: `1px solid ${colors.border}`,
+                      color: colors.textPrimary, outline: 'none', transition: 'all 0.2s',
+                      fontSize: '1rem'
+                    }}
                   />
                 </div>
-                <div className="form-group">
-                  <label>Password</label>
+                <div style={{ marginBottom: '2rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.textSecondary, fontSize: '0.875rem' }}>Password</label>
                   <input
                     type="password"
                     value={newAdmin.password}
                     onChange={e => setNewAdmin({ ...newAdmin, password: e.target.value })}
                     required
+                    style={{
+                      width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem',
+                      background: colors.bgInput, border: `1px solid ${colors.border}`,
+                      color: colors.textPrimary, outline: 'none', transition: 'all 0.2s',
+                      fontSize: '1rem'
+                    }}
                   />
                 </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                  <button type="button" onClick={() => setShowModal(false)} style={{
+                    padding: '0.75rem 1.5rem', borderRadius: '0.75rem', background: 'transparent',
+                    border: `1px solid ${colors.border}`, color: colors.textSecondary, cursor: 'pointer',
+                    fontSize: '1rem'
+                  }}>
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-success">
-                    <CheckIcon size={20} />
+                  <button type="submit" style={{
+                    padding: '0.75rem 1.5rem', borderRadius: '0.75rem', border: 'none',
+                    background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', color: 'white',
+                    cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold'
+                  }}>
                     Create Admin
                   </button>
                 </div>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Note Modal for Loan Decision */}
+      {noteModal.show && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000
+        }} onClick={() => setNoteModal({ show: false, loanId: null, action: null })}>
+          <div style={{
+            background: colors.bgCard,
+            padding: '2rem', borderRadius: '1rem',
+            border: `1px solid ${colors.border}`,
+            width: '100%', maxWidth: '450px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)'
+          }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 1.5rem 0', color: colors.textPrimary }}>
+              <span style={{ 
+                color: noteModal.action === 'approve' ? '#10b981' : '#ef4444' 
+              }}>
+                {noteModal.action === 'approve' ? 'Approve' : 'Reject'}
+              </span> Loan Request
+            </h3>
+            
+            <form onSubmit={submitLoanDecision}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', color: colors.textSecondary, marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                  Admin Notes (Optional)
+                </label>
+                <textarea
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  placeholder="Reason for approval/rejection or instructions for customer..."
+                  rows="4"
+                  style={{
+                    width: '100%', padding: '0.75rem',
+                    background: colors.bgInput,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '0.5rem',
+                    color: colors.textPrimary,
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                    fontSize: '0.95rem'
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setNoteModal({ show: false, loanId: null, action: null })}
+                  style={{
+                    padding: '0.75rem 1.5rem', background: 'transparent',
+                    color: colors.textSecondary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '500'
+                  }}>
+                  Cancel
+                </button>
+                <button type="submit"
+                  style={{
+                    padding: '0.75rem 1.5rem', 
+                    background: noteModal.action === 'approve' 
+                      ? 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' 
+                      : 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)',
+                    color: 'white', border: 'none', 
+                    borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '600'
+                  }}>
+                  Confirm {noteModal.action === 'approve' ? 'Approve' : 'Reject'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

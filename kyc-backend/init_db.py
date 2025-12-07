@@ -31,8 +31,8 @@ def init_db():
                 cursor.execute(f"DROP TABLE {table}")
                 conn.commit()
                 print(f"Dropped {table}")
-            except:
-                pass
+            except Exception as e:
+                print(f"Error dropping {table}: {e}")
 
         # 1. USERS (Unified)
         try:

@@ -145,10 +145,11 @@ def upload_document(user_id, doc_type, doc_number, expiry, filepath):
         cursor.execute(sql, (user_id, doc_type, encrypted_num, expiry, filepath, datetime.datetime.now()))
         conn.commit()
         log_audit(user_id, 'document_upload')
-        return True
+        log_audit(user_id, 'document_upload')
+        return True, None
     except Exception as e:
         print(f"Doc Upload Error: {e}")
-        return False
+        return False, str(e)
     finally:
         conn.close()
 
@@ -173,15 +174,18 @@ def get_user_documents(user_id):
     return docs
 
 # --- VERIFICATIONS (Updated for Unified Users) ---
-def get_verification_requests():
+def get_verification_requests(show_history=False):
     conn = connect_db()
     if not conn: return []
     cursor = conn.cursor()
     requests = []
     try:
-        # Get users with documents pending? Or just users who are pending?
-        # Let's show users who are pending.
-        cursor.execute("SELECT user_id, first_name, last_name, email, phone, kyc_status, created_at FROM USERS WHERE kyc_status = 'pending' AND user_type = 'customer'")
+        if show_history:
+            sql = "SELECT user_id, first_name, last_name, email, phone, kyc_status, created_at FROM USERS WHERE user_type = 'customer'"
+        else:
+            sql = "SELECT user_id, first_name, last_name, email, phone, kyc_status, created_at FROM USERS WHERE user_type = 'customer' AND kyc_status = 'pending'"
+        
+        cursor.execute(sql)
         for row in cursor.fetchall():
             # Get docs for this user
             user_id = row[0]
@@ -248,7 +252,7 @@ def get_all_loan_requests(status_filter='pending'):
         sql = """SELECT L.loan_id, L.loan_amount, L.tenure_months, L.loan_purpose, L.application_status, L.application_date, 
                         U.first_name, U.last_name, U.email, U.phone
                  FROM LOAN_APPLICATIONS L INNER JOIN USERS U ON L.user_id = U.user_id"""
-        if status_filter:
+        if status_filter and status_filter != 'all':
             sql += f" WHERE L.application_status = '{status_filter}'"
             
         cursor.execute(sql)
@@ -274,7 +278,7 @@ def get_customer_loans(user_id):
     cursor = conn.cursor()
     loans = []
     try:
-        cursor.execute("""SELECT loan_id, loan_amount, tenure_months, loan_purpose, application_status, application_date 
+        cursor.execute("""SELECT loan_id, loan_amount, tenure_months, loan_purpose, application_status, application_date, admin_notes, pdf_document_path 
                           FROM LOAN_APPLICATIONS WHERE user_id = ?""", (user_id,))
         for row in cursor.fetchall():
             loans.append({
@@ -283,33 +287,26 @@ def get_customer_loans(user_id):
                 "term": row[2],
                 "purpose": row[3],
                 "status": row[4],
-                "applied_at": str(row[5])
+                "applied_at": str(row[5]),
+                "notes": row[6],
+                "pdf_path": row[7]
             })
     finally:
         conn.close()
     return loans
 
-def update_loan_decision(loan_id, decision, admin_id, pdf_path):
+def update_loan_decision(loan_id, decision, admin_id, pdf_path, notes=""):
     conn = connect_db()
-    if not conn: return None
+    if not conn: return False
     cursor = conn.cursor()
-    new_status = 'approved' if decision == 'approve' else 'rejected'
     try:
+        status = 'approved' if decision == 'approve' else 'rejected'
+        # update status, admin, date, notes, pdf_path
         sql = """UPDATE LOAN_APPLICATIONS 
-                 SET application_status = ?, approved_by = ?, approval_date = ?, pdf_document_path = ? 
+                 SET application_status = ?, approved_by = ?, approval_date = ?, admin_notes = ?, pdf_document_path = ?
                  WHERE loan_id = ?"""
-        cursor.execute(sql, (new_status, admin_id, datetime.datetime.now(), pdf_path, loan_id))
+        cursor.execute(sql, (status, admin_id, datetime.datetime.now(), notes, pdf_path, loan_id))
         conn.commit()
-        log_audit(admin_id, f'loan_{decision}_{loan_id}')
-        
-        # Fetch details for PDF return (if needed immediately) or logic outside
-        # Existing logic fetches details inside update? Let's just return details needed for PDF generation BEFORE update? 
-        # Actually logic is: update DB then generate PDF?
-        # Warning: Prompt said "updates Access + generates PDF... store pdf_document_path".
-        # So I need to generate PDF *first* to get path, or update path *after*?
-        # Let's fetch details -> return them -> App generates PDF -> App updates DB with path? 
-        # Simpler: This function updates status. App generates PDF. App calls another DB update? 
-        # Or I do it all here given I passed pdf_path?
         return True
     except Exception as e:
         print(f"Update Loan Error: {e}")
@@ -323,7 +320,7 @@ def get_loan_details(loan_id):
     cursor = conn.cursor()
     try:
         sql = """SELECT L.loan_id, L.loan_amount, L.tenure_months, L.loan_purpose, L.application_status, 
-                        U.first_name, U.last_name, U.email, U.phone
+                        U.first_name, U.last_name, U.email, U.phone, L.application_date
                  FROM LOAN_APPLICATIONS L INNER JOIN USERS U ON L.user_id = U.user_id
                  WHERE L.loan_id = ?"""
         cursor.execute(sql, (loan_id,))
@@ -337,7 +334,8 @@ def get_loan_details(loan_id):
                 "status": row[4],
                 "customer": f"{row[5]} {row[6]}",
                 "email": row[7],
-                "phone": row[8]
+                "phone": row[8],
+                "applied_at": str(row[9]) if row[9] else "N/A"
             }
         return None
     finally:

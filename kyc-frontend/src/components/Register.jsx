@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import { UserIcon, PhoneIcon, CalendarIcon, LockIcon, ShieldIcon, SunIcon, MoonIcon } from './Icons';
 
 function Register() {
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
+    email: '',
     cnic: '',
     phone: '',
     dob: '',
@@ -41,20 +43,19 @@ function Register() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
-          email: formData.cnic
+          ...formData
         })
       });
       const data = await res.json();
 
       if (data.success) {
-        alert('✅ ' + data.message);
+        toast.success(data.message);
         navigate('/login');
       } else {
-        alert('❌ ' + data.message);
+        toast.error(data.message);
       }
     } catch (err) {
-      alert('❌ Error registering. Please try again.');
+      toast.error('Error registering. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -227,6 +228,25 @@ function Register() {
                   style={inputStyle}
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Email */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={labelStyle}>Email Address</label>
+            <div style={{ position: 'relative' }}>
+              <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: colors.textDim }}>
+                <UserIcon size={18} />
+              </div>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="name@example.com"
+                required
+                style={inputStyle}
+              />
             </div>
           </div>
 

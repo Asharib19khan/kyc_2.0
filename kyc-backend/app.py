@@ -37,7 +37,9 @@ def require_auth(role_required=None):
     token = auth_header.split(" ")[1] if " " in auth_header else auth_header
     role, username, user_id = parse_token(token)
     if not role: return False
-    if role_required and role != role_required: return False
+    if role_required:
+        if role == 'super_admin': pass # Super admin can access everything
+        elif role != role_required: return False
     return {"role": role, "username": username, "user_id": int(user_id)}
 
 @app.route('/register', methods=['POST'])
@@ -96,15 +98,16 @@ def upload_document():
         
         # Save to DB
         # Store relative path or just filename. Storing filename for simplicity.
-        success = db.upload_document(user_info['user_id'], doc_type, doc_number, expiry, filename)
+        success, error_msg = db.upload_document(user_info['user_id'], doc_type, doc_number, expiry, filename)
         if success:
             return jsonify({"success": True})
-    return jsonify({"success": False, "message": "Upload failed"})
+    return jsonify({"success": False, "message": f"Upload failed: {error_msg}"})
 
 @app.route('/admin/verification-requests', methods=['GET'])
 def verification_requests():
     if not require_auth('admin'): return jsonify({"success": False}), 403
-    reqs = db.get_verification_requests()
+    show_history = request.args.get('show_history', 'false').lower() == 'true'
+    reqs = db.get_verification_requests(show_history=show_history)
     return jsonify({"success": True, "data": reqs})
 
 @app.route('/admin/verify', methods=['POST'])
@@ -119,6 +122,17 @@ def verify_user():
 def apply_loan():
     user_info = require_auth('customer')
     if not user_info: return jsonify({"success": False}), 403
+    
+    # Check if verified
+    conn = db.connect_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT kyc_status FROM USERS WHERE user_id = ?", (user_info['user_id'],))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row or row[0] != 'verified':
+        return jsonify({"success": False, "message": "KYC Verification required"}), 403
+
     data = request.json
     success = db.create_loan_request(user_info['user_id'], data['amount'], data['term'], data['purpose'])
     return jsonify({"success": success})
@@ -131,42 +145,77 @@ def loan_requests():
 
 @app.route('/admin/loan-decision', methods=['POST'])
 def loan_decision():
+    print("Received Loan Decision Request") # DEBUG
     user_info = require_auth('admin')
-    if not user_info: return jsonify({"success": False}), 403
-    data = request.json
+    if not user_info: 
+        print("Auth Failed") # DEBUG
+        return jsonify({"success": False}), 403
     
+    data = request.json
+    print(f"Decision Data: {data}") # DEBUG
+
     # 1. Get Loan Details for PDF
     loan_details = db.get_loan_details(data['loan_id'])
-    if not loan_details: return jsonify({"success": False}), 400
+    if not loan_details: 
+        print("Loan not found") # DEBUG
+        return jsonify({"success": False}), 400
     
-    # Add decision info to details (since it's not in DB yet)
-    loan_details['status'] = 'approved' if data['decision'] == 'approve' else 'rejected'
-    loan_details['admin'] = user_info['username']
-    loan_details['decided_at'] = str(datetime.datetime.now())
-    
-    # 2. Generate PDF
-    pdf_filename = reports.generate_loan_pdf(loan_details)
-    
-    # 3. Update DB with decision and PDF path
-    result = db.update_loan_decision(data['loan_id'], data['decision'], user_info['user_id'], pdf_filename)
-    
-    if result:
-        download_url = f"/download-pdf/{pdf_filename}"
-        return jsonify({"success": True, "download_url": download_url})
-    return jsonify({"success": False, "message": "Error updating loan"})
+    # 2. Add decision info
+    decision_status = 'approved' if data['decision'] == 'approve' else 'rejected'
+    loan_details['status'] = decision_status
+    loan_details['decided_at'] = datetime.datetime.now().strftime("%Y-%m-%d")
+    loan_details['notes'] = data.get('notes', '')
 
-@app.route('/customer/loans', methods=['GET'])
-def customer_loans():
-    user_info = require_auth('customer')
-    if not user_info: return jsonify({"success": False}), 403
-    loans = db.get_customer_loans(user_info['user_id'])
-    return jsonify({"success": True, "data": loans})
+    # 3. Generate PDF
+    try:
+        print("Generating PDF...") # DEBUG
+        pdf_filename = reports.generate_loan_pdf(loan_details)
+        print(f"PDF Generated: {pdf_filename}") # DEBUG
+    except Exception as e:
+        print(f"PDF Gen Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "message": f"PDF Error: {e}"}), 500
+
+    # 4. Update Database
+    print("Updating Database...") # DEBUG
+    success = db.update_loan_decision(
+        loan_id=data['loan_id'],
+        decision=data['decision'],
+        admin_id=user_info['user_id'],
+        pdf_path=pdf_filename,
+        notes=data.get('notes', '')
+    )
+    
+    if success:
+        print("Update Success") # DEBUG
+        return jsonify({"success": True})
+    else:
+        print("Update Failed") # DEBUG
+        return jsonify({"success": False, "message": "Database update failed"}), 500
 
 @app.route('/export/excel', methods=['GET'])
 def export_excel():
     if not require_auth('admin'): return jsonify({"success": False}), 403
     verifications, loans = db.get_export_data()
     filename = reports.generate_excel_report(verifications, loans)
+    return jsonify({"success": True, "download_url": f"/download-report/{filename}"})
+
+@app.route('/export/csv', methods=['GET'])
+def export_csv():
+    if not require_auth('admin'): return jsonify({"success": False}), 403
+    export_type = request.args.get('type')  # 'customers' or 'loans'
+    
+    verifications, loans = db.get_export_data()
+    
+    if export_type == 'customers':
+        data = verifications
+    elif export_type == 'loans':
+        data = loans
+    else:
+        return jsonify({"success": False, "message": "Invalid type"}), 400
+        
+    filename = reports.generate_csv_report(data, export_type)
     return jsonify({"success": True, "download_url": f"/download-report/{filename}"})
 
 @app.route('/download-pdf/<filename>')

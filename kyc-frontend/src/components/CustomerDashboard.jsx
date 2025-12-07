@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   HomeIcon, FileIcon, DollarIcon, LogoutIcon,
   UploadIcon, CheckIcon, XIcon, AlertIcon,
-  CalendarIcon, ShieldIcon, MenuIcon, SunIcon, MoonIcon
+  CalendarIcon, ShieldIcon, MenuIcon, SunIcon, MoonIcon, DownloadIcon
 } from './Icons';
+import { toast } from 'react-hot-toast';
 
 function CustomerDashboard() {
   const [activeSection, setActiveSection] = useState('overview');
@@ -76,7 +77,7 @@ function CustomerDashboard() {
   const applyLoan = async (e) => {
     e.preventDefault();
     if (user.status !== 'verified') {
-      alert('You must be verified to apply for a loan.');
+      toast.error('You must be verified to apply for a loan.');
       return;
     }
 
@@ -91,17 +92,17 @@ function CustomerDashboard() {
       });
       const data = await res.json();
       if (data.success) {
-        alert('Loan application submitted successfully!');
+        toast.success('Loan application submitted successfully!');
         fetchLoans();
         setAmount('');
         setTerm('');
         setPurpose('');
         setActiveSection('loans');
       } else {
-        alert('Failed to submit application.');
+        toast.error('Failed to submit application.');
       }
     } catch (error) {
-      alert(`Error: ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     }
   };
 
@@ -121,23 +122,31 @@ function CustomerDashboard() {
       });
       const data = await res.json();
       if (data.success) {
-        alert('Document uploaded successfully!');
+        toast.success('Document uploaded successfully!');
         setFile(null);
         setDocNumber('');
         setExpiry('');
         document.querySelector('input[type="file"]').value = '';
       } else {
-        alert(`Upload failed: ${data.message || 'Please try again.'}`);
+        toast.error(`Upload failed: ${data.message || 'Please try again.'}`);
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert(`Upload failed: ${error.message || 'Network error. Check if the server is running.'}`);
+      toast.error(`Upload failed: ${error.message || 'Network error. Check if the server is running.'}`);
     }
   };
-
   const logout = () => {
     localStorage.clear();
     navigate('/login');
+  };
+
+  // Download PDF from backend
+  const generateLoanPDF = (loan) => {
+    if (loan.pdf_path) {
+      window.open(`http://localhost:5000/download-pdf/${loan.pdf_path}`, '_blank');
+    } else {
+      toast.error("Official certificate not available for this loan.");
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -161,9 +170,10 @@ function CustomerDashboard() {
       <div style={{
         width: sidebarOpen ? '280px' : '0',
         minWidth: sidebarOpen ? '280px' : '0',
-        background: theme === 'dark' ? 'rgba(22, 22, 42, 0.98)' : 'rgba(255, 255, 255, 0.98)',
+        background: theme === 'dark' ? 'rgba(22, 22, 42, 0.98)' : '#ffffff',
         backdropFilter: 'blur(20px)',
         borderRight: `1px solid ${colors.border}`,
+        boxShadow: theme === 'light' ? '4px 0 20px rgba(0,0,0,0.08)' : 'none',
         padding: sidebarOpen ? '1.5rem' : '0',
         display: 'flex',
         flexDirection: 'column',
@@ -218,13 +228,18 @@ function CustomerDashboard() {
             { id: 'overview', icon: HomeIcon, label: 'Overview' },
             { id: 'upload', icon: UploadIcon, label: 'Upload Documents' },
             ...(user.status === 'verified' ? [{ id: 'apply', icon: DollarIcon, label: 'Apply for Loan' }] : []),
-            { id: 'loans', icon: FileIcon, label: 'My Applications', badge: loans.length }
+            { id: 'loans', icon: FileIcon, label: 'My Applications', badge: loans.length },
+            ...(loans.filter(l => l.status === 'approved' || l.status === 'rejected').length > 0 ? 
+              [{ id: 'documents', icon: DownloadIcon, label: 'Loan Documents' }] : [])
           ].map(item => (
             <a key={item.id} onClick={() => setActiveSection(item.id)} style={{
               display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.875rem 1rem',
-              marginBottom: '0.5rem', color: activeSection === item.id ? 'white' : '#cbd5e1',
+              marginBottom: '0.5rem', 
+              color: activeSection === item.id ? 'white' : colors.textSecondary,
               textDecoration: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '500',
-              background: activeSection === item.id ? 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)' : 'transparent',
+              background: activeSection === item.id 
+                ? 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)' 
+                : theme === 'light' ? 'rgba(0,0,0,0.02)' : 'transparent',
               boxShadow: activeSection === item.id ? '0 4px 12px rgba(99, 102, 241, 0.3)' : 'none',
               transition: 'all 0.2s ease'
             }}>
@@ -253,7 +268,7 @@ function CustomerDashboard() {
       <div style={{ flex: 1, marginLeft: sidebarOpen ? '280px' : '0', padding: '2rem', transition: 'margin-left 0.3s ease' }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: `1px solid ${colors.border}` }}>
           <div>
             <h1 style={{ fontSize: '2rem', fontWeight: '800', color: colors.textPrimary, margin: 0 }}>
               {activeSection === 'overview' && 'Dashboard'}
@@ -261,7 +276,7 @@ function CustomerDashboard() {
               {activeSection === 'apply' && 'Apply for Loan'}
               {activeSection === 'loans' && 'My Applications'}
             </h1>
-            <p style={{ color: colors.textSecondary, margin: '0.5rem 0 0 0' }}>Welcome, {user.name}</p>
+            <p style={{ color: colors.textSecondary, margin: '0.5rem 0 0 0' }}>Greetings, {user.name}</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button onClick={toggleTheme} style={{
@@ -317,16 +332,28 @@ function CustomerDashboard() {
                 { value: loans.filter(l => l.status === 'pending').length, label: 'Pending', icon: AlertIcon, color: '#f59e0b' },
                 { value: loans.filter(l => l.status === 'approved').length, label: 'Approved', icon: CheckIcon, color: '#10b981' }
               ].map((stat, idx) => (
-                <div key={idx} style={{ background: 'rgba(30, 30, 56, 0.7)', backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(255,255,255,0.08)', borderRadius: '1rem', padding: '1.5rem', position: 'relative', overflow: 'hidden' }}>
+                <div key={idx} style={{ 
+                  background: colors.bgCard, 
+                  backdropFilter: 'blur(20px)',
+                  border: `1px solid ${colors.border}`, 
+                  borderRadius: '1rem', 
+                  padding: '1.5rem', 
+                  position: 'relative', 
+                  overflow: 'hidden',
+                  boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
+                }}>
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: `linear-gradient(90deg, ${stat.color} 0%, ${stat.color}88 100%)` }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <div style={{ fontSize: '2rem', fontWeight: '800', color: '#f1f5f9' }}>{stat.value}</div>
-                      <div style={{ color: '#94a3b8', fontSize: '0.875rem', textTransform: 'uppercase' }}>{stat.label}</div>
+                      <div style={{ fontSize: '2rem', fontWeight: '800', color: colors.textPrimary }}>{stat.value}</div>
+                      <div style={{ color: colors.textSecondary, fontSize: '0.875rem', textTransform: 'uppercase' }}>{stat.label}</div>
                     </div>
-                    <div style={{ width: '48px', height: '48px', borderRadius: '0.75rem', background: `${stat.color}20`, color: stat.color,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ 
+                      width: '48px', height: '48px', borderRadius: '0.75rem', 
+                      background: theme === 'light' ? `${stat.color}15` : `${stat.color}20`, 
+                      color: stat.color,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center' 
+                    }}>
                       <stat.icon size={24} />
                     </div>
                   </div>
@@ -339,13 +366,14 @@ function CustomerDashboard() {
               
               {/* Verification Progress */}
               <div style={{ 
-                background: 'rgba(30, 30, 56, 0.7)', 
+                background: colors.bgCard, 
                 backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.08)', 
+                border: `1px solid ${colors.border}`, 
                 borderRadius: '1rem', 
                 padding: '1.5rem',
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
               }}>
                 {/* Top accent bar */}
                 <div style={{ 
@@ -354,7 +382,7 @@ function CustomerDashboard() {
                 }} />
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                  <h3 style={{ color: '#f1f5f9', margin: 0, fontSize: '1rem', fontWeight: '600' }}>Verification Status</h3>
+                  <h3 style={{ color: colors.textPrimary, margin: 0, fontSize: '1rem', fontWeight: '600' }}>Verification Status</h3>
                   <span style={{ 
                     fontSize: '0.75rem', 
                     color: user.status === 'verified' ? '#10b981' : user.status === 'pending' ? '#f59e0b' : '#ef4444',
@@ -368,7 +396,7 @@ function CustomerDashboard() {
                   {/* Vertical line */}
                   <div style={{ 
                     position: 'absolute', left: '8px', top: '8px', bottom: '8px', width: '2px',
-                    background: 'rgba(100,116,139,0.3)'
+                    background: theme === 'dark' ? 'rgba(100,116,139,0.3)' : 'rgba(100,116,139,0.2)'
                   }} />
                   
                   {[
@@ -386,8 +414,8 @@ function CustomerDashboard() {
                       <div style={{ 
                         position: 'absolute', left: '-1.5rem',
                         width: '18px', height: '18px', borderRadius: '50%', 
-                        background: step.done ? '#10b981' : 'rgba(30, 30, 56, 1)',
-                        border: step.done ? 'none' : '2px solid rgba(100,116,139,0.5)',
+                        background: step.done ? '#10b981' : theme === 'dark' ? 'rgba(30, 30, 56, 1)' : '#e2e8f0',
+                        border: step.done ? 'none' : theme === 'dark' ? '2px solid rgba(100,116,139,0.5)' : '2px solid #cbd5e1',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         zIndex: 1
                       }}>
@@ -396,11 +424,11 @@ function CustomerDashboard() {
                       
                       <div style={{ flex: 1 }}>
                         <div style={{ 
-                          color: step.done ? '#f1f5f9' : '#94a3b8', 
+                          color: step.done ? colors.textPrimary : colors.textSecondary, 
                           fontSize: '0.875rem', fontWeight: '500'
                         }}>{step.label}</div>
                         <div style={{ 
-                          color: '#64748b', fontSize: '0.75rem', marginTop: '0.125rem'
+                          color: colors.textMuted, fontSize: '0.75rem', marginTop: '0.125rem'
                         }}>{step.detail}</div>
                       </div>
                     </div>
@@ -410,13 +438,14 @@ function CustomerDashboard() {
 
               {/* Account Information */}
               <div style={{ 
-                background: 'rgba(30, 30, 56, 0.7)', 
+                background: colors.bgCard, 
                 backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.08)', 
+                border: `1px solid ${colors.border}`, 
                 borderRadius: '1rem', 
                 padding: '1.5rem',
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
               }}>
                 {/* Top accent bar */}
                 <div style={{ 
@@ -425,7 +454,7 @@ function CustomerDashboard() {
                 }} />
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                  <h3 style={{ color: '#f1f5f9', margin: 0, fontSize: '1rem', fontWeight: '600' }}>Account Information</h3>
+                  <h3 style={{ color: colors.textPrimary, margin: 0, fontSize: '1rem', fontWeight: '600' }}>Account Information</h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                     <ShieldIcon size={14} style={{ color: '#10b981' }} />
                     <span style={{ fontSize: '0.6875rem', color: '#10b981', fontWeight: '600' }}>SECURE</span>
@@ -437,13 +466,13 @@ function CustomerDashboard() {
                   <div style={{ 
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '0.75rem 1rem', 
-                    background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%)', 
+                    background: theme === 'dark' ? 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%)' : 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.15) 100%)', 
                     borderRadius: '0.5rem',
                     border: '1px solid rgba(99,102,241,0.2)'
                   }}>
                     <div>
-                      <div style={{ fontSize: '0.6875rem', color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Customer ID</div>
-                      <div style={{ fontSize: '1.125rem', color: '#f1f5f9', fontWeight: '700', marginTop: '0.125rem', fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: '0.6875rem', color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Customer ID</div>
+                      <div style={{ fontSize: '1.125rem', color: colors.textPrimary, fontWeight: '700', marginTop: '0.125rem', fontFamily: 'monospace' }}>
                         CUS-{String(user.id ? user.id - 1 : 1).padStart(4, '0')}
                       </div>
                     </div>
@@ -451,23 +480,23 @@ function CustomerDashboard() {
                       padding: '0.375rem 0.625rem', 
                       background: 'rgba(99,102,241,0.2)', 
                       borderRadius: '0.375rem',
-                      fontSize: '0.6875rem', color: '#a5b4fc', fontWeight: '600'
+                      fontSize: '0.6875rem', color: '#6366f1', fontWeight: '600'
                     }}>PRIMARY</div>
                   </div>
                   
                   {/* Other details */}
                   {[
                     { label: 'Full Name', value: user.name || 'Not provided' },
-                    { label: 'Account Type', value: 'Individual Customer' },
+                    { label: 'Account Type', value: 'Personal Account' },
                     { label: 'Loan Eligibility', value: user.status === 'verified' ? 'Eligible' : 'Complete KYC first' }
                   ].map((item, idx) => (
                     <div key={idx} style={{ 
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '0.625rem 0', 
-                      borderBottom: idx < 2 ? '1px solid rgba(255,255,255,0.06)' : 'none'
+                      borderBottom: idx < 2 ? `1px solid ${colors.border}` : 'none'
                     }}>
-                      <span style={{ fontSize: '0.8125rem', color: '#94a3b8' }}>{item.label}</span>
-                      <span style={{ fontSize: '0.875rem', color: '#f1f5f9', fontWeight: '500' }}>{item.value}</span>
+                      <span style={{ fontSize: '0.8125rem', color: colors.textSecondary }}>{item.label}</span>
+                      <span style={{ fontSize: '0.875rem', color: colors.textPrimary, fontWeight: '500' }}>{item.value}</span>
                     </div>
                   ))}
                 </div>
@@ -507,8 +536,8 @@ function CustomerDashboard() {
                     <AlertIcon size={24} style={{ color: 'white' }} />
                   </div>
                   <div>
-                    <h4 style={{ margin: 0, color: '#f1f5f9', fontSize: '1rem', fontWeight: '600' }}>Action Required</h4>
-                    <p style={{ margin: '0.25rem 0 0 0', color: '#fcd34d', fontSize: '0.8125rem' }}>
+                    <h4 style={{ margin: 0, color: colors.textPrimary, fontSize: '1rem', fontWeight: '600' }}>Action Required</h4>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#d97706', fontSize: '0.8125rem' }}>
                       Upload your documents to complete verification
                     </p>
                   </div>
@@ -516,10 +545,10 @@ function CustomerDashboard() {
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.6875rem', color: '#fcd34d', marginBottom: '0.125rem' }}>
+                    <div style={{ fontSize: '0.6875rem', color: '#d97706', marginBottom: '0.125rem' }}>
                       You are customer
                     </div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#f1f5f9' }}>
+                    <div style={{ fontSize: '1.25rem', fontWeight: '700', color: colors.textPrimary }}>
                       #{user.id ? user.id - 1 : 1}
                     </div>
                   </div>
@@ -540,15 +569,25 @@ function CustomerDashboard() {
         {/* Upload Documents Section */}
         {activeSection === 'upload' && (
           <div>
-            <div style={{ background: 'rgba(30, 30, 56, 0.7)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.08)', borderRadius: '1rem', padding: '2rem' }}>
-              <h3 style={{ color: '#f1f5f9', marginBottom: '1.5rem' }}>Upload Identity Documents</h3>
+            <div style={{ 
+              background: colors.bgCard, 
+              backdropFilter: 'blur(20px)',
+              border: `1px solid ${colors.border}`, 
+              borderRadius: '1rem', 
+              padding: '2rem',
+              boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
+            }}>
+              <h3 style={{ color: colors.textPrimary, marginBottom: '1.5rem', fontWeight: '600' }}>Upload Identity Documents</h3>
               <form onSubmit={handleUpload}>
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Document Type</label>
+                  <label style={{ display: 'block', color: colors.textSecondary, marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Document Type</label>
                   <select value={docType} onChange={e => setDocType(e.target.value)} style={{
-                    width: '100%', padding: '0.875rem 1rem', background: 'rgba(15, 15, 30, 0.6)',
-                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem', color: '#f1f5f9', fontSize: '1rem'
+                    width: '100%', padding: '0.875rem 1rem', 
+                    background: theme === 'dark' ? 'rgba(15, 15, 30, 0.6)' : '#f8fafc',
+                    border: `1px solid ${colors.border}`, 
+                    borderRadius: '0.5rem', 
+                    color: colors.textPrimary, 
+                    fontSize: '1rem'
                   }}>
                     <option value="CNIC">CNIC / National ID</option>
                     <option value="Passport">Passport</option>
@@ -557,40 +596,55 @@ function CustomerDashboard() {
                 </div>
 
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                  <label style={{ display: 'block', color: colors.textSecondary, marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
                     {docType === 'CNIC' ? 'CNIC Number' : docType === 'Passport' ? 'Passport Number' : 'License Number'}
                   </label>
                   <input value={docNumber} onChange={e => setDocNumber(e.target.value)}
                     placeholder={docType === 'CNIC' ? 'e.g., 12345-6789012-3' : docType === 'Passport' ? 'e.g., AB1234567' : 'e.g., DL-12345'}
-                    required style={{ width: '100%', padding: '0.875rem 1rem', background: 'rgba(15, 15, 30, 0.6)',
-                      border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem', color: '#f1f5f9', fontSize: '1rem' }} />
-                  <small style={{ color: '#64748b', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>
+                    required style={{ 
+                      width: '100%', padding: '0.875rem 1rem', 
+                      background: theme === 'dark' ? 'rgba(15, 15, 30, 0.6)' : '#f8fafc',
+                      border: `1px solid ${colors.border}`, 
+                      borderRadius: '0.5rem', 
+                      color: colors.textPrimary, 
+                      fontSize: '1rem' 
+                    }} />
+                  <small style={{ color: colors.textMuted, fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>
                     Enter your official {docType === 'CNIC' ? 'CNIC' : docType} number
                   </small>
                 </div>
 
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Expiry Date</label>
+                  <label style={{ display: 'block', color: colors.textSecondary, marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Expiry Date</label>
                   <input type="date" value={expiry} onChange={e => setExpiry(e.target.value)} required style={{
-                    width: '100%', padding: '0.875rem 1rem', background: 'rgba(15, 15, 30, 0.6)',
-                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem', color: '#f1f5f9', fontSize: '1rem'
+                    width: '100%', padding: '0.875rem 1rem', 
+                    background: theme === 'dark' ? 'rgba(15, 15, 30, 0.6)' : '#f8fafc',
+                    border: `1px solid ${colors.border}`, 
+                    borderRadius: '0.5rem', 
+                    color: colors.textPrimary, 
+                    fontSize: '1rem'
                   }} />
                 </div>
 
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Document Image</label>
+                  <label style={{ display: 'block', color: colors.textSecondary, marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Document Image</label>
                   <input type="file" onChange={e => setFile(e.target.files[0])} accept="image/*" required style={{
-                    width: '100%', padding: '0.875rem 1rem', background: 'rgba(15, 15, 30, 0.6)',
-                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem', color: '#f1f5f9', fontSize: '1rem'
+                    width: '100%', padding: '0.875rem 1rem', 
+                    background: theme === 'dark' ? 'rgba(15, 15, 30, 0.6)' : '#f8fafc',
+                    border: `1px solid ${colors.border}`, 
+                    borderRadius: '0.5rem', 
+                    color: colors.textPrimary, 
+                    fontSize: '1rem'
                   }} />
-                  <small style={{ color: '#64748b', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>
+                  <small style={{ color: colors.textMuted, fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>
                     Accepted formats: JPG, PNG. Max size: 5MB
                   </small>
                 </div>
 
                 <button type="submit" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
                   padding: '1rem 1.5rem', background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
-                  color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '600', fontSize: '1rem' }}>
+                  color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '600', fontSize: '1rem',
+                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.35)' }}>
                   <UploadIcon size={20} /> Upload Document
                 </button>
               </form>
@@ -601,23 +655,37 @@ function CustomerDashboard() {
         {/* Apply for Loan Section */}
         {activeSection === 'apply' && user.status === 'verified' && (
           <div>
-            <div style={{ background: 'rgba(30, 30, 56, 0.7)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.08)', borderRadius: '1rem', padding: '2rem' }}>
-              <h3 style={{ color: '#f1f5f9', marginBottom: '1.5rem' }}>Loan Application</h3>
+            <div style={{ 
+              background: colors.bgCard, 
+              backdropFilter: 'blur(20px)',
+              border: `1px solid ${colors.border}`, 
+              borderRadius: '1rem', 
+              padding: '2rem',
+              boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
+            }}>
+              <h3 style={{ color: colors.textPrimary, marginBottom: '1.5rem', fontWeight: '600' }}>Loan Application</h3>
               <form onSubmit={applyLoan}>
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Loan Amount ($)</label>
+                  <label style={{ display: 'block', color: colors.textSecondary, marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Loan Amount ($)</label>
                   <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g., 50000" min="1000" required style={{
-                    width: '100%', padding: '0.875rem 1rem', background: 'rgba(15, 15, 30, 0.6)',
-                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem', color: '#f1f5f9', fontSize: '1rem'
+                    width: '100%', padding: '0.875rem 1rem', 
+                    background: theme === 'dark' ? 'rgba(15, 15, 30, 0.6)' : '#f8fafc',
+                    border: `1px solid ${colors.border}`, 
+                    borderRadius: '0.5rem', 
+                    color: colors.textPrimary, 
+                    fontSize: '1rem'
                   }} />
                 </div>
 
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Loan Term (Months)</label>
+                  <label style={{ display: 'block', color: colors.textSecondary, marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Loan Term (Months)</label>
                   <select value={term} onChange={e => setTerm(e.target.value)} required style={{
-                    width: '100%', padding: '0.875rem 1rem', background: 'rgba(15, 15, 30, 0.6)',
-                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem', color: '#f1f5f9', fontSize: '1rem'
+                    width: '100%', padding: '0.875rem 1rem', 
+                    background: theme === 'dark' ? 'rgba(15, 15, 30, 0.6)' : '#f8fafc',
+                    border: `1px solid ${colors.border}`, 
+                    borderRadius: '0.5rem', 
+                    color: colors.textPrimary, 
+                    fontSize: '1rem'
                   }}>
                     <option value="">Select term</option>
                     <option value="12">12 months</option>
@@ -629,16 +697,21 @@ function CustomerDashboard() {
                 </div>
 
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Purpose</label>
+                  <label style={{ display: 'block', color: colors.textSecondary, marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Purpose</label>
                   <input value={purpose} onChange={e => setPurpose(e.target.value)} placeholder="e.g., Home renovation, Business expansion" required style={{
-                    width: '100%', padding: '0.875rem 1rem', background: 'rgba(15, 15, 30, 0.6)',
-                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem', color: '#f1f5f9', fontSize: '1rem'
+                    width: '100%', padding: '0.875rem 1rem', 
+                    background: theme === 'dark' ? 'rgba(15, 15, 30, 0.6)' : '#f8fafc',
+                    border: `1px solid ${colors.border}`, 
+                    borderRadius: '0.5rem', 
+                    color: colors.textPrimary, 
+                    fontSize: '1rem'
                   }} />
                 </div>
 
                 <button type="submit" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                  padding: '1rem 1.5rem', background: '#10b981',
-                  color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '600', fontSize: '1rem' }}>
+                  padding: '1rem 1.5rem', background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+                  color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '600', fontSize: '1rem',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)' }}>
                   <DollarIcon size={20} /> Submit Application
                 </button>
               </form>
@@ -650,41 +723,57 @@ function CustomerDashboard() {
         {activeSection === 'loans' && (
           <div>
             {loans.length === 0 ? (
-              <div style={{ background: 'rgba(30, 30, 56, 0.7)', backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.08)', borderRadius: '1rem', padding: '3rem', textAlign: 'center' }}>
-                <FileIcon size={64} style={{ margin: '0 auto 1rem', color: '#64748b' }} />
-                <h3 style={{ color: '#f1f5f9', marginBottom: '0.5rem' }}>No Applications Yet</h3>
-                <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>
+              <div style={{ 
+                background: colors.bgCard, 
+                backdropFilter: 'blur(20px)',
+                border: `1px solid ${colors.border}`, 
+                borderRadius: '1rem', 
+                padding: '3rem', 
+                textAlign: 'center',
+                boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
+              }}>
+                <FileIcon size={64} style={{ margin: '0 auto 1rem', color: colors.textMuted }} />
+                <h3 style={{ color: colors.textPrimary, marginBottom: '0.5rem' }}>No Applications Yet</h3>
+                <p style={{ color: colors.textMuted, marginBottom: '1.5rem' }}>
                   {user.status === 'verified' ? "You haven't applied for any loans yet" : 'Complete verification to apply for loans'}
                 </p>
                 {user.status === 'verified' && (
                   <button onClick={() => setActiveSection('apply')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
                     padding: '0.875rem 1.5rem', background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
-                    color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '600' }}>
+                    color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '600',
+                    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.35)' }}>
                     <DollarIcon size={20} /> Apply for Your First Loan
                   </button>
                 )}
               </div>
             ) : (
-              <div style={{ background: 'rgba(30, 30, 56, 0.7)', backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.08)', borderRadius: '1rem', overflow: 'hidden' }}>
+              <div style={{ 
+                background: colors.bgCard, 
+                backdropFilter: 'blur(20px)',
+                border: `1px solid ${colors.border}`, 
+                borderRadius: '1rem', 
+                overflow: 'hidden',
+                boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
+              }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                      <th style={{ padding: '1rem', textAlign: 'left', color: '#94a3b8', fontWeight: '600', fontSize: '0.875rem' }}>Loan ID</th>
-                      <th style={{ padding: '1rem', textAlign: 'left', color: '#94a3b8', fontWeight: '600', fontSize: '0.875rem' }}>Amount</th>
-                      <th style={{ padding: '1rem', textAlign: 'left', color: '#94a3b8', fontWeight: '600', fontSize: '0.875rem' }}>Term</th>
-                      <th style={{ padding: '1rem', textAlign: 'left', color: '#94a3b8', fontWeight: '600', fontSize: '0.875rem' }}>Purpose</th>
-                      <th style={{ padding: '1rem', textAlign: 'left', color: '#94a3b8', fontWeight: '600', fontSize: '0.875rem' }}>Status</th>
+                    <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Loan ID</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Amount</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Term</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Purpose</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Notes</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', color: colors.textSecondary, fontWeight: '600', fontSize: '0.875rem' }}>Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loans.map(loan => (
-                      <tr key={loan.loan_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                        <td style={{ padding: '1rem', color: '#f1f5f9' }}><strong>#{loan.loan_id}</strong></td>
+                      <tr key={loan.loan_id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                        <td style={{ padding: '1rem', color: colors.textPrimary }}><strong>#{loan.loan_id}</strong></td>
                         <td style={{ padding: '1rem', color: '#10b981', fontWeight: '600' }}>${loan.amount?.toLocaleString()}</td>
-                        <td style={{ padding: '1rem', color: '#cbd5e1' }}>{loan.term} months</td>
-                        <td style={{ padding: '1rem', color: '#cbd5e1' }}>{loan.purpose}</td>
+                        <td style={{ padding: '1rem', color: colors.textSecondary }}>{loan.term} months</td>
+                        <td style={{ padding: '1rem', color: colors.textSecondary }}>{loan.purpose}</td>
+                        <td style={{ padding: '1rem', color: colors.textMuted, fontSize: '0.875rem', maxWidth: '200px' }}>{loan.notes || '-'}</td>
                         <td style={{ padding: '1rem' }}>{getStatusBadge(loan.status)}</td>
                       </tr>
                     ))}
@@ -692,6 +781,108 @@ function CustomerDashboard() {
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Loan Documents Section */}
+        {activeSection === 'documents' && (
+          <div>
+            <div style={{ 
+              background: colors.bgCard, 
+              backdropFilter: 'blur(20px)',
+              border: `1px solid ${colors.border}`, 
+              borderRadius: '1rem', 
+              padding: '2rem',
+              boxShadow: theme === 'light' ? '0 4px 20px rgba(0,0,0,0.08)' : 'none'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div style={{ 
+                  width: '40px', height: '40px', borderRadius: '0.75rem', 
+                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <DownloadIcon size={20} style={{ color: 'white' }} />
+                </div>
+                <div>
+                  <h3 style={{ color: colors.textPrimary, margin: 0, fontWeight: '600' }}>Loan Decision Documents</h3>
+                  <p style={{ color: colors.textMuted, margin: 0, fontSize: '0.875rem' }}>Download certificates for your processed applications</p>
+                </div>
+              </div>
+              
+              {loans.filter(l => l.status === 'approved' || l.status === 'rejected').length === 0 ? (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '3rem',
+                  background: theme === 'dark' ? 'rgba(15, 15, 30, 0.4)' : '#f8fafc',
+                  borderRadius: '0.75rem'
+                }}>
+                  <AlertIcon size={48} style={{ color: colors.textMuted, marginBottom: '1rem' }} />
+                  <h4 style={{ color: colors.textPrimary, marginBottom: '0.5rem' }}>No Documents Available</h4>
+                  <p style={{ color: colors.textMuted }}>Documents will appear here once your loan applications are processed.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  {loans.filter(l => l.status === 'approved' || l.status === 'rejected').map(loan => (
+                    <div key={loan.loan_id} style={{ 
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '1.25rem', 
+                      background: theme === 'dark' ? 'rgba(15, 15, 30, 0.4)' : '#f8fafc',
+                      borderRadius: '0.75rem',
+                      border: `1px solid ${loan.status === 'approved' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                      flexWrap: 'wrap',
+                      gap: '1rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ 
+                          width: '50px', height: '50px', borderRadius: '0.75rem', 
+                          background: loan.status === 'approved' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                          {loan.status === 'approved' ? 
+                            <CheckIcon size={24} style={{ color: '#10b981' }} /> : 
+                            <XIcon size={24} style={{ color: '#ef4444' }} />
+                          }
+                        </div>
+                        <div>
+                          <div style={{ 
+                            fontWeight: '600', color: colors.textPrimary, 
+                            display: 'flex', alignItems: 'center', gap: '0.5rem' 
+                          }}>
+                            Loan #{loan.loan_id}
+                            {getStatusBadge(loan.status)}
+                          </div>
+                          <div style={{ color: colors.textSecondary, fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                            ${loan.amount?.toLocaleString()} • {loan.term} months • {loan.purpose}
+                          </div>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => generateLoanPDF(loan)}
+                        style={{ 
+                          display: 'flex', alignItems: 'center', gap: '0.5rem',
+                          padding: '0.75rem 1.25rem', 
+                          background: loan.status === 'approved' 
+                            ? 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' 
+                            : 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
+                          color: 'white', 
+                          border: 'none', 
+                          borderRadius: '0.5rem', 
+                          cursor: 'pointer', 
+                          fontWeight: '600',
+                          fontSize: '0.875rem',
+                          boxShadow: loan.status === 'approved' 
+                            ? '0 4px 12px rgba(16, 185, 129, 0.35)' 
+                            : '0 4px 12px rgba(99, 102, 241, 0.35)'
+                        }}
+                      >
+                        <DownloadIcon size={16} />
+                        Download Certificate
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

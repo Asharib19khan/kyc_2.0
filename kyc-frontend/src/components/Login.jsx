@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import { UserIcon, LockIcon, ShieldIcon, SunIcon, MoonIcon } from './Icons';
 
 function Login() {
@@ -50,10 +51,10 @@ function Login() {
           navigate('/customer');
         }
       } else {
-        alert(data.message || 'Invalid credentials');
+        toast.error(data.message || 'Invalid credentials');
       }
     } catch (err) {
-      alert('Login failed. Please try again.');
+      toast.error('Login failed. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -254,7 +255,7 @@ function Login() {
                 transition: 'color 0.3s ease'
               }}
             >
-              {role === 'customer' ? 'CNIC Number' : 'Username'}
+              {role === 'customer' ? 'Email Address' : 'Username'}
             </label>
             <div style={{ position: 'relative' }}>
               <div 
@@ -269,10 +270,10 @@ function Login() {
                 <UserIcon size={18} />
               </div>
               <input
-                type="text"
+                type={role === 'customer' ? 'email' : 'text'}
                 value={cnic}
                 onChange={(e) => setCnic(e.target.value)}
-                placeholder={role === 'customer' ? 'XXXXX-XXXXXXX-X' : 'Enter username'}
+                placeholder={role === 'customer' ? 'name@example.com' : 'Enter username'}
                 required
                 style={{
                   width: '100%',
